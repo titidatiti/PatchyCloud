@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: transparent !important;
+            color: #333;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            -webkit-app-region: drag; /* 允许拖拽窗口 */
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            width: 480px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            -webkit-app-region: no-drag; /* 内容区域不可拖拽 */
+        }
+
+        .title-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            -webkit-app-region: drag;
+        }
+
+        .window-title {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .close-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff5f57;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            transition: all 0.2s ease;
+            -webkit-app-region: no-drag;
+        }
+
+        .close-btn:hover {
+            background: #e14942;
+            transform: scale(1.1);
+        }
+
+        .content {
+            margin-top: 40px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #4a5568;
+            font-size: 13px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .size-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .input-suffix {
+            position: relative;
+        }
+
+        .input-suffix input {
+            padding-right: 35px;
+        }
+
+        .input-suffix::after {
+            content: '%';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #718096;
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .trigger-input::after {
+            content: 'px';
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.8);
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: #cbd5e0;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .help-text {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .display-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 8px;
+            margin: 4px 0;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .display-option:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: rgba(102, 126, 234, 0.2);
+        }
+
+        .display-info {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .primary-badge {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title-bar">
+            <div class="window-title">PachyCloud Settings</div>
+            <button class="close-btn" onclick="window.close()">×</button>
+        </div>
+        
+        <div class="content">
+            <h1 class="title">个性化设置</h1>
+            
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label for="url">默认网站地址</label>
+                    <input type="url" id="url" name="url" placeholder="https://weibo.com/titidatiti" required>
+                    <div class="help-text">输入你希望应用显示的网站地址</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="displayId">选定显示器</label>
+                    <select id="displayId" name="displayId" required>
+                    </select>
+                    <div class="help-text">选择应用在哪个显示器上生效</div>
+                </div>
+
+                <div class="form-group">
+                    <label>窗口大小</label>
+                    <div class="size-inputs">
+                        <div class="input-suffix">
+                            <input type="number" id="width" name="width" min="10" max="100" placeholder="50" required>
+                            <label for="width" style="margin: 4px 0 0 0; font-size: 11px;">宽度</label>
+                        </div>
+                        <div class="input-suffix">
+                            <input type="number" id="height" name="height" min="10" max="100" placeholder="50" required>
+                            <label for="height" style="margin: 4px 0 0 0; font-size: 11px;">高度</label>
+                        </div>
+                    </div>
+                    <div class="help-text">以屏幕百分比设置窗口大小 (10-100%)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="triggerDistance">触发范围</label>
+                    <div class="input-suffix trigger-input">
+                        <input type="number" id="triggerDistance" name="triggerDistance" min="1" max="100" placeholder="10" required>
+                    </div>
+                    <div class="help-text">鼠标距离屏幕底部多少像素时显示窗口</div>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">取消</button>
+                    <button type="submit" class="btn btn-primary" id="saveBtn">
+                        <span>保存设置</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = {};
+        let availableDisplays = [];
+
+        // 监听配置加载
+        window.electronAPI.onLoadConfig((event, config) => {
+            currentConfig = config;
+            loadConfigToForm(config);
+        });
+
+        // 监听显示器列表加载
+        window.electronAPI.onLoadDisplays((event, displays) => {
+            availableDisplays = displays;
+            loadDisplaysToSelect(displays);
+        });
+
+        // 加载显示器到选择框
+        function loadDisplaysToSelect(displays) {
+            const select = document.getElementById('displayId');
+            //select.innerHTML = '<option value="primary">主显示器</option>';
+            
+            displays.forEach(display => {
+                const option = document.createElement('option');
+                option.value = display.id;
+                const index = select.options.length + 1;
+                let label = `${index}. ${display.label}` || `显示器 ${display.id}`;
+                if (display.primary) {
+                    label += ' (主显示器)';
+                }
+                label += ` - ${display.bounds.width}×${display.bounds.height}`;
+                
+                option.textContent = label;
+                select.appendChild(option);
+                if (display.selected) {
+                    option.selected = true;
+                }
+            });
+        }
+
+        // 加载配置到表单
+        function loadConfigToForm(config) {
+            document.getElementById('url').value = config.url || '';
+            document.getElementById('width').value = config.width || 50;
+            document.getElementById('height').value = config.height || 50;
+            document.getElementById('triggerDistance').value = config.triggerDistance || 10;
+            document.getElementById('displayId').value = config.displayId || 'primary';
+        }
+
+        // 表单提交处理
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const saveBtn = document.getElementById('saveBtn');
+            const form = document.getElementById('settingsForm');
+            
+            // 显示加载状态
+            saveBtn.innerHTML = '<span>保存中...</span>';
+            form.classList.add('loading');
+            
+            try {
+                const formData = new FormData(e.target);
+                const config = {
+                    url: formData.get('url'),
+                    width: parseInt(formData.get('width')),
+                    height: parseInt(formData.get('height')),
+                    triggerDistance: parseInt(formData.get('triggerDistance')),
+                    displayId: formData.get('displayId')
+                };
+
+                // 验证URL格式
+                try {
+                    new URL(config.url);
+                } catch {
+                    throw new Error('请输入有效的网站地址');
+                }
+
+                // 保存配置
+                const success = await window.electronAPI.saveConfig(config);
+                
+                if (success) {
+                    saveBtn.innerHTML = '<span>保存成功!</span>';
+                    setTimeout(() => {
+                        window.close();
+                    }, 1000);
+                } else {
+                    throw new Error('保存失败');
+                }
+            } catch (error) {
+                alert('保存设置时出错: ' + error.message);
+                saveBtn.innerHTML = '<span>保存设置</span>';
+                form.classList.remove('loading');
+            }
+        });
+
+        // 取消按钮
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            window.close();
+        });
+
+        // 初始化时获取配置
+        window.electronAPI.getConfig().then(config => {
+            currentConfig = config;
+            loadConfigToForm(config);
+        });
+
+        // 输入验证
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const min = parseInt(e.target.getAttribute('min'));
+                const max = parseInt(e.target.getAttribute('max'));
+                const value = parseInt(e.target.value);
+                
+                if (value < min) e.target.value = min;
+                if (value > max) e.target.value = max;
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+    "name": "PatchyCloud",
+    "version": "1.1.0",
+    "description": "可折叠的悬浮Web工具栏",
+    "main": "src/main.js",
+    "scripts": {
+      "start": "electron .",
+      "dev": "electron . --dev --remote-debugging-port=9222",
+      "debug-main": "electron . --inspect=9229 --remote-debugging-port=9222",
+      "debug": "npm run debug-main",
+      "build": "electron-builder",
+      "build-win": "electron-builder --win",
+      "build-mac": "electron-builder --mac"
+    },
+    "keywords": ["electron", "floating", "web", "desktop"],
+    "author": "Your Name",
+    "license": "MIT",
+    "devDependencies": {
+      "electron": "^27.0.0",
+      "electron-builder": "^24.6.4"
+    },
+    "build": {
+      "appId": "com.cwbeta.patchycloud",
+      "productName": "PatchyCloud",
+      "directories": {
+        "output": "dist"
+      },
+      "files": [
+        "src/**/*",
+        "assets/**/*"
+      ],
+      "win": {
+        "target": "nsis",
+        "icon": "assets/icon.ico"
+      },
+      "mac": {
+        "target": "dmg",
+        "icon": "assets/icon.icns",
+        "category": "public.app-category.utilities"
+      },
+      "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true
+      }
+    }
+  }
