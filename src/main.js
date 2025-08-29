@@ -24,7 +24,7 @@ const ANIMATION_CONFIG = {
 
 // 默认配置
 const defaultConfig = {
-  url: 'https://weibo.com/titidatiti',
+  url: 'https://github.com/titidatiti/PatchyCloud',
   width: 50, // 百分比
   height: 50, // 百分比
   triggerDistance: 10, // 像素
@@ -71,7 +71,7 @@ function forceAlwaysOnTop() {
         }
       }
     }, 10);*/
-    mainWindow.setAlwaysOnTop(true, 'pop-up-menu');
+    mainWindow.setAlwaysOnTop(true, 'floating');
     //mainWindow.moveTop();
   }
 }
@@ -109,8 +109,10 @@ function CreateView() {
   // 创建主内容视图
   view = new BrowserView({
     webPreferences: {
-      transparent: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      webSecurity: false,
       preload: path.join(__dirname, 'preload.js')
     }
   });
@@ -159,13 +161,6 @@ function createMainWindow() {
     show: true,
     x: workArea.x + Math.floor((workArea.width - windowWidth) / 2),
     y: targetDisplay.bounds.y + targetDisplay.bounds.height + hiddenOffset,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      webSecurity: false,
-      preload: path.join(__dirname, 'preload.js')
-    }
   });
 
   CreateView();
@@ -213,12 +208,12 @@ function showMainWindow() {
   }
   
   const targetDisplay = getTargetDisplay();
-  const workArea = targetDisplay.workArea;
   const bounds = targetDisplay.bounds;
-  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
+  const { width: windowWidth, height: windowHeight, taskBarHeight: taskBarHeight } = getWindowConfigSize();
   
-  const centerX = workArea.x + Math.floor((workArea.width - windowWidth) / 2);
-  const targetY = workArea.y + workArea.height - windowHeight;
+  const centerX = bounds.x + Math.floor((bounds.width - windowWidth) / 2);
+  const targetY = bounds.y + bounds.height - windowHeight - taskBarHeight;
+  console.log(`显示窗口到位置: (${centerX}, ${targetY})`);
   const hiddenY = bounds.y + bounds.height + hiddenOffset;
   
   if (!mainWindow.isVisible()) {
@@ -229,8 +224,6 @@ function showMainWindow() {
   if (currentBounds.y == targetY) {
     return;
   }
-  
-  forceAlwaysOnTop();
 
   const startY = currentBounds.y;
   isAnimating = true;
@@ -245,6 +238,7 @@ function showMainWindow() {
     const currentY = Math.round(startY - distance * easedProgress);
     
     mainWindow.setPosition(centerX, currentY);
+    console.log(`动画进度: ${progress.toFixed(2)}, 位置: (${centerX}, ${currentY}), 窗口大小: ${mainWindow.getBounds().width}x${mainWindow.getBounds().height}`);
     
     if (progress >= 1) {
       clearInterval(showAnimation);
@@ -298,18 +292,27 @@ function hideMainWindow() {
 }
 
 function getWindowConfigSize(){
+  // 不知道为什么，副屏上workarea一会儿扣除任务栏高度，一会儿不扣，我服了，之前写的从主屏获取任务栏的处理现在暂时注释掉
+
   const targetDisplay = getTargetDisplay();
-  const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
+  //const primaryDisplay = screen.getPrimaryDisplay();
+  //const isPrimary = targetDisplay.id === primaryDisplay.id;
+
+  const workArea = targetDisplay.workArea;
+  const screenWidth = targetDisplay.bounds.width;
+  const screenHeight = targetDisplay.bounds.height;
   
-  // 总窗口宽度是内容区域加上工具栏宽度
-  const windowWidth = Math.floor(screenWidth * config.width / 100);
-  // 计算内容区域宽度（不包含工具栏）
-  const contentWidth = windowWidth - TOOLBAR_WIDTH;
-  const windowHeight = Math.floor(screenHeight * config.height / 100);
-  
+  const taskBarHeight = screenHeight - workArea.height; //primaryDisplay.bounds.height - primaryDisplay.workArea.height
+
+  let windowWidth = Math.floor(workArea.width * config.width / 100);
+  let windowHeight = Math.floor(workArea.height * config.height / 100);
+
+  console.log(`计算窗口大小: ${windowWidth}x${windowHeight} (屏幕: ${screenWidth}x${screenHeight}, 工作区: ${workArea.width}x${workArea.height}, 任务栏高度: ${taskBarHeight})`);
+
   return {
     width: windowWidth,
-    height: windowHeight
+    height: windowHeight,
+    taskBarHeight: taskBarHeight
   };
 }
 
@@ -571,14 +574,14 @@ ipcMain.handle('save-config', (event, newConfig) => {
     const targetDisplay = getTargetDisplay();
     const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
     const { x: screenX, y: screenY } = targetDisplay.bounds;
-    const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
+    const {width:windowWidth, height:windowHeight, taskBarHeight: taskBarHeight} = getWindowConfigSize();
     
     // 计算位置
-    const centerX = screenX + Math.floor((screenWidth - windowWidth) / 2);
+    const x = screenX + Math.floor((screenWidth - windowWidth) / 2);
     const targetY = screenY + screenHeight - windowHeight; // 目标位置（显示状态）
     const hiddenY = screenY + screenHeight + hiddenOffset; // 隐藏位置
 
-    mainWindow.setBounds(centerX, hiddenY, windowWidth, windowHeight);
+    mainWindow.setBounds(x, hiddenY, windowWidth, windowHeight);
     CreateView();
     console.log(`窗口大小已更新: ${windowWidth}x${windowHeight}`);
   }
@@ -624,10 +627,3 @@ app.on('window-all-closed', (event) => {
 app.on('before-quit', () => {
   stopMouseTracking();
 });
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow();
-  }
-});
-

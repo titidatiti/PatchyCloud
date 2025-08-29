@@ -1,6 +1,11 @@
-# 浮动Web助手
-
+# PatchyCloud - 啪唧云菜单
+![PatchyCloud - 啪唧云菜单](./assets/icon.png)
 一个基于Electron的跨平台桌面应用，提供隐藏式浮动Web浏览器功能。当鼠标移动到屏幕底部边缘时，应用会从屏幕外滑入显示指定网站内容，不使用时自动隐藏，不影响其他软件的正常使用。
+
+推荐用于配合开源项目MacroDeck使用，从而获得一个快捷面板：
+https://github.com/Macro-Deck-App/Macro-Deck
+
+也可以自己创建一个本地的HTML，通过多个iframe组合你喜欢的工具，然后引用你的本地地址。
 
 ## 功能特点
 
@@ -17,8 +22,7 @@
 
 1. **克隆项目**
 ```bash
-git clone <项目地址>
-cd floating-web-app
+git clone https://github.com/titidatiti/PatchyCloud.git
 ```
 
 2. **安装依赖**
@@ -56,7 +60,7 @@ npm run build
 
 1. 运行应用后会自动弹出设置窗口
 2. 配置以下选项：
-   - **默认网站地址**: 设置要显示的网站（默认：https://weibo.com/titidatiti）
+   - **默认网站地址**: 设置要显示的网站（默认：https://github.com/titidatiti/PatchyCloud）
    - **窗口大小**: 以百分比设置宽度和高度（默认：50% x 50%）
    - **触发范围**: 鼠标距离底部多少像素时触发显示（默认：10px）
 3. 点击"保存设置"完成配置
@@ -74,77 +78,22 @@ npm run build
 - **设置** - 重新打开设置窗口修改配置
 - **退出** - 完全退出应用
 
-## 项目结构
-
-```
-floating-web-app/
-├── src/
-│   ├── main.js          # Electron主进程
-│   ├── preload.js       # 预加载脚本
-│   └── settings.html    # 设置界面
-├── assets/
-│   ├── icon.ico         # Windows图标
-│   ├── icon.icns        # macOS图标
-│   └── icon.png         # 通用图标
-├── package.json         # 项目配置
-└── README.md           # 说明文档
-```
-
 ## 配置文件
 
 应用配置自动保存在用户数据目录：
-- **Windows**: `%APPDATA%/floating-web-app/config.json`
-- **macOS**: `~/Library/Application Support/floating-web-app/config.json`
+- **Windows**: `%APPDATA%/PatchyCloud/config.json`
+- **macOS**: `~/Library/Application Support/PatchyCloud/config.json`
 
 配置格式：
 ```json
 {
-  "url": "https://weibo.com/titidatiti",
+  "url": "你想要设定的网址",
   "width": 50,
   "height": 50,
-  "triggerDistance": 10
+  "triggerDistance": 10,
+  "displayId": "显示器ID"
 }
 ```
-
-## 技术栈
-
-- **Electron** - 跨平台桌面应用框架
-- **Node.js** - 后端运行时
-- **HTML/CSS/JavaScript** - 前端界面
-- **Electron Builder** - 应用打包工具
-
-## 系统要求
-
-- **Windows**: Windows 10或更高版本
-- **macOS**: macOS 10.14或更高版本
-- **内存**: 最少512MB可用内存
-- **硬盘**: 100MB可用空间
-
-## 开发说明
-
-### 关键特性实现
-
-1. **鼠标位置监测**: 使用`screen.getCursorScreenPoint()`持续监测鼠标位置
-2. **无边框窗口**: 设置`frame: false`和`transparent: true`
-3. **窗口动画**: 通过改变窗口位置实现滑入滑出效果
-4. **系统托盘**: 使用`Tray`类创建托盘图标和菜单
-5. **配置持久化**: 使用JSON文件保存用户配置
-
-### 主要模块
-
-- `createMainWindow()`: 创建主浮动窗口
-- `createSettingsWindow()`: 创建设置窗口
-- `createTray()`: 创建系统托盘
-- `startMouseTracking()`: 开始鼠标位置监控
-- `showMainWindow()`/`hideMainWindow()`: 窗口显示/隐藏动画
-
-## 自定义图标
-
-将你的图标文件放置在`assets`目录：
-- `icon.ico` - Windows图标（建议256x256）
-- `icon.icns` - macOS图标
-- `icon.png` - 通用PNG图标
-
 ## 故障排除
 
 ### 常见问题
@@ -152,8 +101,5 @@ floating-web-app/
 **Q: 应用无法显示网站内容**
 A: 检查网站地址是否正确和网络连接。某些网站可能不允许在iframe中显示。
 
-**Q: 鼠标触发不灵敏**
-A: 在设置中调整触发范围，增大数值可提高触发灵敏度。
-
-**Q: 应用无法启动**
-A: 确保已正确安装所有依赖
+**Q: 展开啪唧云窗口后，窗口下的其他软件窗口会遮住开始菜单**
+A: 这是Windows平台下自带的BUG，当有置顶应用出现时，开始菜单会自动降级，导致层级低于其他普通窗口，目前暂无解决方法。
