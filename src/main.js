@@ -57,6 +57,25 @@ function saveConfig() {
   }
 }
 
+function forceAlwaysOnTop() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    /*
+    // 临时取消置顶再重新设置，确保刷新置顶状态
+    mainWindow.setAlwaysOnTop(false);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setAlwaysOnTop(true, 'floating', 1);
+        // 在某些系统上，focus() 可以帮助确保置顶
+        if (mainWindow.isVisible()) {
+          mainWindow.focus();
+        }
+      }
+    }, 10);*/
+    mainWindow.setAlwaysOnTop(true, 'pop-up-menu');
+    //mainWindow.moveTop();
+  }
+}
+
 // 获取目标显示器
 function getTargetDisplay() {
   const displays = screen.getAllDisplays();
@@ -74,9 +93,9 @@ let toolbarView;
 let isPinned = false;
 const TOOLBAR_WIDTH = 56; // 工具栏宽度
 
-function CreateView(){
+function CreateView() {
   const targetDisplay = getTargetDisplay();
-  const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
+  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
   
   // 创建工具栏视图
   toolbarView = new BrowserView({
@@ -99,7 +118,7 @@ function CreateView(){
   mainWindow.setBrowserView(toolbarView);
   mainWindow.addBrowserView(view);
   
-  // 设置工具栏位置和大小
+  // 设置视图边界...
   toolbarView.setBounds({
     x: 0,
     y: 0,
@@ -107,7 +126,6 @@ function CreateView(){
     height: windowHeight
   });
   
-  // 设置主内容区域位置和大小，确保宽度是配置的百分比
   const contentWidth = windowWidth - TOOLBAR_WIDTH;
   view.setBounds({
     x: TOOLBAR_WIDTH,
@@ -116,7 +134,7 @@ function CreateView(){
     height: windowHeight
   });
   
-  // 加载工具栏和网页内容
+  // 加载内容
   toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
   view.webContents.loadURL(config.url);
 }
@@ -125,9 +143,8 @@ function CreateView(){
 function createMainWindow() {
   const targetDisplay = getTargetDisplay();
   const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
-  const { x: screenX /*unused*/, y: screenY /*unused*/ } = targetDisplay.bounds;
   const workArea = targetDisplay.workArea;
-  const { width:windowWidth, height:windowHeight} = getWindowConfigSize();
+  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
   
   mainWindow = new BrowserWindow({
     width: windowWidth,
@@ -136,13 +153,11 @@ function createMainWindow() {
     transparent: true,
     hasShadow: true,
     roundedCorners: true,
-    alwaysOnTop: true,
+    alwaysOnTop: false,
     skipTaskbar: true,
     resizable: false,
     show: true,
-    // 使用 workArea 保证不覆盖任务栏
     x: workArea.x + Math.floor((workArea.width - windowWidth) / 2),
-    // 初始位置放到屏幕外（使用 bounds 以便完全移出屏幕）
     y: targetDisplay.bounds.y + targetDisplay.bounds.height + hiddenOffset,
     webPreferences: {
       nodeIntegration: false,
@@ -153,20 +168,25 @@ function createMainWindow() {
     }
   });
 
-  // 保证始终在上层（使用 floating，不使用 screen-saver）
-  mainWindow.setAlwaysOnTop(true, 'floating');
-
   CreateView();
 
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   
   mainWindow.on('blur', () => {
-    hideMainWindow();
+    setTimeout(() => {
+      if (!isPinned) {
+        hideMainWindow();
+      }
+    }, 100);
   });
 
   mainWindow.on('close', (event) => {
     event.preventDefault();
     hideMainWindow();
+  });
+
+  mainWindow.on('show', () => {
+    //forceAlwaysOnTop();
   });
 }
 
@@ -195,27 +215,24 @@ function showMainWindow() {
   const targetDisplay = getTargetDisplay();
   const workArea = targetDisplay.workArea;
   const bounds = targetDisplay.bounds;
-  const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
+  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
   
-  // 使用 workArea 计算显示位置，避免覆盖任务栏
   const centerX = workArea.x + Math.floor((workArea.width - windowWidth) / 2);
-  const targetY = workArea.y + workArea.height - windowHeight; // 在工作区底部显示（不遮挡任务栏）
-  const hiddenY = bounds.y + bounds.height + hiddenOffset; // 隐藏位置（屏幕外）
+  const targetY = workArea.y + workArea.height - windowHeight;
+  const hiddenY = bounds.y + bounds.height + hiddenOffset;
   
   if (!mainWindow.isVisible()) {
     mainWindow.setPosition(centerX, hiddenY);
-    mainWindow.show();
   }
-  // 再次确保置顶（防止被其他窗口覆盖）
-  mainWindow.setAlwaysOnTop(true, 'floating');
   
-  const currentBounds = mainWindow.getBounds();
+   const currentBounds = mainWindow.getBounds();
   if (currentBounds.y == targetY) {
     return;
   }
   
+  forceAlwaysOnTop();
+
   const startY = currentBounds.y;
-  
   isAnimating = true;
   const startTime = Date.now();
   const distance = startY - targetY;
@@ -226,13 +243,14 @@ function showMainWindow() {
     const easing = easingFunctions[ANIMATION_CONFIG.easing] || easingFunctions.easeOutCubic;
     const easedProgress = easing(progress);
     const currentY = Math.round(startY - distance * easedProgress);
+    
     mainWindow.setPosition(centerX, currentY);
+    
     if (progress >= 1) {
       clearInterval(showAnimation);
       showAnimation = null;
       isAnimating = false;
       mainWindow.setPosition(centerX, targetY);
-      mainWindow.setAlwaysOnTop(true, 'floating');
     }
   }, 1000 / ANIMATION_CONFIG.fps);
 }
@@ -275,37 +293,8 @@ function hideMainWindow() {
       isAnimating = false;
       const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
       mainWindow.setBounds(currentBounds.x, targetY, windowWidth, windowHeight);
-      // 隐藏在屏幕外仍然置顶（不影响任务栏）
-      mainWindow.setAlwaysOnTop(true, 'floating');
     }
   }, 1000 / ANIMATION_CONFIG.fps);
-}
-
-// 立即显示窗口（无动画，用于调试或特殊情况）
-function showMainWindowInstant() {
-  if (!mainWindow) return;
-  if (showAnimation) {
-    clearInterval(showAnimation);
-    showAnimation = null;
-  }
-  if (hideAnimation) {
-    clearInterval(hideAnimation);
-    hideAnimation = null;
-  }
-  isAnimating = false;
-  
-  const targetDisplay = getTargetDisplay();
-  const workArea = targetDisplay.workArea;
-  const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
-  mainWindow.setPosition(
-    workArea.x + Math.floor((workArea.width - mainWindow.getBounds().width) / 2),
-    workArea.y + workArea.height - windowHeight
-  );
-  
-  if (!mainWindow.isVisible()) {
-    mainWindow.show();
-  }
-  mainWindow.setAlwaysOnTop(true, 'floating');
 }
 
 function getWindowConfigSize(){
@@ -322,27 +311,6 @@ function getWindowConfigSize(){
     width: windowWidth,
     height: windowHeight
   };
-}
-
-// 立即隐藏窗口（无动画）- 移动到屏幕外
-function hideMainWindowInstant() {
-  if (!mainWindow) return;
-  if (showAnimation) {
-    clearInterval(showAnimation);
-    showAnimation = null;
-  }
-  if (hideAnimation) {
-    clearInterval(hideAnimation);
-    hideAnimation = null;
-  }
-  isAnimating = false;
-  
-  const targetDisplay = getTargetDisplay();
-  const { y: screenY, height: screenHeight } = targetDisplay.bounds;
-  const currentBounds = mainWindow.getBounds();
-  
-  mainWindow.setPosition(currentBounds.x, screenY + screenHeight);
-  mainWindow.setAlwaysOnTop(true, 'floating');
 }
 
 // 检查窗口是否正在动画中
@@ -362,7 +330,7 @@ function getAnimationConfig() {
 
 // 清理函数（在应用退出时调用）
 function cleanupAnimations() {
-  if (showAnimation) {
+   if (showAnimation) {
     clearInterval(showAnimation);
     showAnimation = null;
   }
@@ -377,6 +345,10 @@ function cleanupAnimations() {
   if (hideTimer) {
     clearTimeout(hideTimer);
     hideTimer = null;
+  }
+  if (mouseCheckTimer) {
+    clearTimeout(mouseCheckTimer);
+    mouseCheckTimer = null;
   }
   isAnimating = false;
 }
@@ -570,31 +542,6 @@ function startMouseTracking() {
   checkMouse();
 }
 
-// 清理函数（在应用退出时调用）
-function cleanupAnimations() {
-  if (showAnimation) {
-    clearInterval(showAnimation);
-    showAnimation = null;
-  }
-  if (hideAnimation) {
-    clearInterval(hideAnimation);
-    hideAnimation = null;
-  }
-  if (showTimer) {
-    clearTimeout(showTimer);
-    showTimer = null;
-  }
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-  if (mouseCheckTimer){
-    clearTimeout(mouseCheckTimer);
-    mouseCheckTimer = null;
-  }
-  isAnimating = false;
-}
-
 // 停止鼠标位置监控
 function stopMouseTracking() {
   isMouseTracking = false;
@@ -667,14 +614,7 @@ app.whenReady().then(() => {
   createMainWindow();
   createTray();
   startMouseTracking();
-
-  // 额外保护：当系统上其他窗口创建或获得焦点时，重新申明置顶，防止被覆盖
-  app.on('browser-window-created', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(true, 'floating');
-  });
-  app.on('browser-window-focus', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(true, 'floating');
-  });
+  forceAlwaysOnTop();
 });
 
 app.on('window-all-closed', (event) => {
@@ -690,3 +630,4 @@ app.on('activate', () => {
     createMainWindow();
   }
 });
+
