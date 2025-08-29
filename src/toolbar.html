@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root {
+      --w: 56px;
+      --bg: rgba(8,8,8,1);
+      --panel-bg: rgba(255,255,255,0.02);
+      --card-bg: rgba(255,255,255,0.03);
+      --divider: rgba(255,255,255,0.06);
+      --active: #4caf50;
+      --fg: #fff;
+      --gap: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100vh;
+      width: var(--w);
+      background: transparent;
+      user-select: none;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    /* 整体栏 */
+    #toolbar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px;
+      gap: var(--gap);
+      background: var(--bg);
+      height: 100vh;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* 顶部 logo 面板（更突出，作为“总”） */
+    .top-panel {
+      width: 100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 8px 0px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: transform .14s ease, background .14s ease;
+    }
+    .logo img { width: 28px; height: 28px; display: block; pointer-events: none; }
+
+    .logo:hover { transform: translateY(-2px); background: rgba(255,255,255,0.035); }
+
+    /* 分隔线，强化“总-分”关系 */
+    .divider {
+      width: 80%;
+      height: 1px;
+      background: var(--divider);
+      opacity: 0.7;
+      margin-top: 6px;
+      margin-bottom: 4px;
+      border-radius: 2px;
+    }
+
+    /* 按钮组（作为“分”）    */
+    .buttons-card {
+      width: calc(100% - 6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-bg);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.02);
+      flex-shrink: 0;
+    }
+
+    .btn {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg);
+      cursor: pointer;
+      opacity: 0.95;
+      transition: all 0.14s ease;
+      margin: 0;
+      flex-shrink: 0;
+      background: transparent;
+    }
+
+    .btn:hover {
+      opacity: 1;
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .btn.active {
+      background: rgba(255,255,255,0.08);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03);
+    }
+    .pin-active { background: var(--active) !important; color: #012; }
+
+    .spacer { flex: 1; min-height: 20px; }
+
+    .material-icons {
+      font-family: 'Material Icons';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      text-transform: none;
+      letter-spacing: normal;
+      white-space: nowrap;
+      -webkit-font-smoothing: antialiased;
+      color: currentColor;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar" role="navigation" aria-label="PatchyCloud toolbar">
+    <!-- 顶层 Logo 面板（总） -->
+    <div class="top-panel" role="banner" aria-hidden="false">
+      <div id="logo" class="logo" title="项目主页" role="button" aria-label="PatchyCloud">
+        <img src="../assets/icon.png" alt="PatchyCloud logo">
+      </div>
+    </div>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <!-- 按钮卡片（分） -->
+    <div class="buttons-card" role="group" aria-label="Toolbar actions">
+      <div id="pin" class="btn" title="窗口位置锁定" aria-label="窗口位置锁定">
+        <span class="material-icons" aria-hidden="true">push_pin</span>
+      </div>
+
+      <div id="settings" class="btn" title="自定义设置" aria-label="自定义设置">
+        <span class="material-icons" aria-hidden="true">settings</span>
+      </div>
+
+      <div style="height:6px;"></div>
+
+      <div class="spacer" aria-hidden="true"></div>
+
+      <div id="quit" class="btn" title="退出" aria-label="退出">
+        <span class="material-icons" aria-hidden="true">exit_to_app</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logoBtn = document.getElementById('logo');
+    const pinBtn = document.getElementById('pin');
+    const settingsBtn = document.getElementById('settings');
+    const quitBtn = document.getElementById('quit');
+
+    logoBtn.addEventListener('click', async () => {
+      try { await window.electronAPI.openExternal('https://github.com/titidatiti/PatchyCloud'); }
+      catch (e) { console.error('openExternal failed', e); }
+    });
+
+    function updatePinUI(active){
+      if (active) pinBtn.classList.add('pin-active');
+      else pinBtn.classList.remove('pin-active');
+    }
+
+    window.electronAPI.getPinState().then(state => updatePinUI(state)).catch(()=>{});
+
+    pinBtn.addEventListener('click', async () => {
+      const newState = await window.electronAPI.togglePin();
+      updatePinUI(newState);
+    });
+
+    settingsBtn.addEventListener('click', async () => { await window.electronAPI.openSettings(); });
+    quitBtn.addEventListener('click', async () => { await window.electronAPI.quitApp(); });
+  </script>
+</body>
+</html>

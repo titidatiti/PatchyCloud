@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView ,Tray, Menu, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, BrowserView ,Tray, Menu, screen, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -70,30 +70,55 @@ function getTargetDisplay() {
   return targetDisplay || screen.getPrimaryDisplay();
 }
 
+let toolbarView;
+let isPinned = false;
+const TOOLBAR_WIDTH = 56; // 工具栏宽度
+
 function CreateView(){
   const targetDisplay = getTargetDisplay();
-  const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
-  
   const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
-  // 使用BrowserView加载第三方页面，避免页面影响到mainWindow的尺寸
+  
+  // 创建工具栏视图
+  toolbarView = new BrowserView({
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'toolbar-preload.js')
+    }
+  });
+  
+  // 创建主内容视图
   view = new BrowserView({
     webPreferences: {
       transparent: true,
-      preload: path.join(__dirname, 'preload.js'), // 预加载脚本
-      contextIsolation: false
+      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js')
     }
-  })
+  });
   
-  mainWindow.setBrowserView(view)
-  view.setBounds({ 
-    x: 0,  // 左侧透明留空
-    y: 0,  // 顶部透明留空
-    width: windowWidth, 
-    height: windowHeight 
-  })
+  mainWindow.setBrowserView(toolbarView);
+  mainWindow.addBrowserView(view);
   
-  // 加载第三方页面
-  view.webContents.loadURL(config.url)
+  // 设置工具栏位置和大小
+  toolbarView.setBounds({
+    x: 0,
+    y: 0,
+    width: TOOLBAR_WIDTH,
+    height: windowHeight
+  });
+  
+  // 设置主内容区域位置和大小，确保宽度是配置的百分比
+  const contentWidth = windowWidth - TOOLBAR_WIDTH;
+  view.setBounds({
+    x: TOOLBAR_WIDTH,
+    y: 0,
+    width: contentWidth,
+    height: windowHeight
+  });
+  
+  // 加载工具栏和网页内容
+  toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
+  view.webContents.loadURL(config.url);
 }
 
 // 创建主窗口
@@ -286,8 +311,13 @@ function showMainWindowInstant() {
 function getWindowConfigSize(){
   const targetDisplay = getTargetDisplay();
   const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
-  const windowHeight = Math.floor(screenHeight * config.height / 100);
+  
+  // 总窗口宽度是内容区域加上工具栏宽度
   const windowWidth = Math.floor(screenWidth * config.width / 100);
+  // 计算内容区域宽度（不包含工具栏）
+  const contentWidth = windowWidth - TOOLBAR_WIDTH;
+  const windowHeight = Math.floor(screenHeight * config.height / 100);
+  
   return {
     width: windowWidth,
     height: windowHeight
@@ -526,7 +556,7 @@ function startMouseTracking() {
 
       if (mouseOutsideWindow) {
         // 延迟隐藏，给用户时间移回窗口
-        if (!hideTimer) {
+        if (!hideTimer && !isPinned) { // 添加 !isPinned 条件
           hideTimer = setTimeout(() => {
             hideMainWindow();
             hideTimer = null;
@@ -573,6 +603,17 @@ function stopMouseTracking() {
 // IPC事件处理
 ipcMain.handle('get-config', () => config);
 
+// 新增：在主进程处理 open-external，使用 shell.openExternal 打开系统浏览器
+ipcMain.handle('open-external', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch (err) {
+    console.error('openExternal error:', err);
+    return false;
+  }
+});
+
 ipcMain.handle('save-config', (event, newConfig) => {
   config = { ...config, ...newConfig };
   saveConfig();
@@ -596,6 +637,23 @@ ipcMain.handle('save-config', (event, newConfig) => {
   }
   
   return true;
+});
+
+ipcMain.handle('toolbar-toggle-pin', () => {
+  isPinned = !isPinned;
+  return isPinned;
+});
+
+ipcMain.handle('toolbar-get-pin', () => {
+  return isPinned;
+});
+
+ipcMain.handle('toolbar-open-settings', () => {
+  createSettingsWindow();
+});
+
+ipcMain.handle('toolbar-quit', () => {
+  quitApp();
 });
 
 // 应用事件
