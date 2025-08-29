@@ -1,5 +1,6 @@
 # PatchyCloud - 啪唧云菜单
 ![PatchyCloud - 啪唧云菜单](./assets/icon.png)
+
 一个基于Electron的跨平台桌面应用，提供隐藏式浮动Web浏览器功能。当鼠标移动到屏幕底部边缘时，应用会从屏幕外滑入显示指定网站内容，不使用时自动隐藏，不影响其他软件的正常使用。
 
 推荐用于配合开源项目MacroDeck使用，从而获得一个快捷面板：
@@ -13,7 +14,7 @@ https://github.com/Macro-Deck-App/Macro-Deck
 - 🚀 **无边框设计** - 现代化的浮动窗口界面
 - ⚙️ **灵活配置** - 自定义网站地址、窗口大小、触发范围
 - 🔧 **系统托盘** - 便捷的设置和退出选项
-- 🌐 **跨平台支持** - Windows和macOS兼容
+- 🌐 **跨平台支持** - Windows、macOS、Linux兼容（计划中，暂未支持）
 - 💾 **自动保存** - 配置自动保存，重启后保持设置
 
 ## 安装和运行
@@ -42,12 +43,12 @@ npm start
 npm run build-win
 ```
 
-**构建macOS版本:**
+**构建macOS版本（暂未测试支持）:**
 ```bash
 npm run build-mac
 ```
 
-**构建所有平台:**
+**构建所有平台（暂未测试支持）:**
 ```bash
 npm run build
 ```
@@ -88,8 +89,8 @@ npm run build
 ```json
 {
   "url": "你想要设定的网址",
-  "width": 50,
-  "height": 50,
+  "width": 100,
+  "height": 100,
   "triggerDistance": 10,
   "displayId": "显示器ID"
 }
@@ -99,7 +100,9 @@ npm run build
 ### 常见问题
 
 **Q: 应用无法显示网站内容**
+
 A: 检查网站地址是否正确和网络连接。某些网站可能不允许在iframe中显示。
 
 **Q: 展开啪唧云窗口后，窗口下的其他软件窗口会遮住开始菜单**
+
 A: 这是Windows平台下自带的BUG，当有置顶应用出现时，开始菜单会自动降级，导致层级低于其他普通窗口，目前暂无解决方法。
