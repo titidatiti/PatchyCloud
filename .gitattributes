@@ -1,0 +1,23 @@
+# 主代码语言
+*.js linguist-language=JavaScript
+*.ts linguist-language=TypeScript
+*.jsx linguist-language=JavaScript
+*.tsx linguist-language=TypeScript
+
+# 排除资源文件，不计入语言统计
+*.html linguist-vendored
+*.css linguist-vendored
+*.scss linguist-vendored
+*.less linguist-vendored
+*.json linguist-vendored
+*.md linguist-vendored
+*.png linguist-vendored
+*.jpg linguist-vendored
+*.jpeg linguist-vendored
+*.gif linguist-vendored
+*.ico linguist-vendored
+*.svg linguist-vendored
+*.woff linguist-vendored
+*.woff2 linguist-vendored
+*.ttf linguist-vendored
+*.eot linguist-vendored
