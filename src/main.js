@@ -71,7 +71,7 @@ function forceAlwaysOnTop() {
         }
       }
     }, 10);*/
-    mainWindow.setAlwaysOnTop(true, 'floating');
+    mainWindow.setAlwaysOnTop(true, 'pop-menu');
     //mainWindow.moveTop();
   }
 }
