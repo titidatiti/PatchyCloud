@@ -1,0 +1,29 @@
+root = true
+
+# 默认规则：UTF-8-BOM、空格缩进
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8-bom
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+
+# Electron 相关文件全部换为 2 空格缩进（JS/TS/JSON/HTML/CSS）
+[*.{js,jsx,ts,tsx}]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+[*.html]
+indent_size = 2
+
+[*.{css,scss}]
+indent_size = 2
+
+
+# Markdown 特殊规则：允许保留行尾空白
+[*.md]
+trim_trailing_whitespace = false

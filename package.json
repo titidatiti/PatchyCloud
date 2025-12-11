@@ -12,7 +12,12 @@
     "build-win": "electron-builder --win",
     "build-mac": "electron-builder --mac"
   },
-  "keywords": ["electron", "floating", "web", "desktop"],
+  "keywords": [
+    "electron",
+    "floating",
+    "web",
+    "desktop"
+  ],
   "author": "titidatiti",
   "license": "MIT",
   "devDependencies": {
@@ -23,8 +28,15 @@
     "icon": "assets/icon.ico",
     "appId": "com.cwbeta.patchycloud",
     "productName": "PatchyCloud",
-    "directories": { "output": "dist" },
-    "files": [ "src/**/*", "assets/**/*" ],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "compression": "maximum",
+    "asar": true,
     "win": {
       "target": "portable",
       "icon": "assets/icon.ico"

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView ,Tray, Menu, screen, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, BrowserView, Tray, Menu, screen, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -79,11 +79,11 @@ function forceAlwaysOnTop() {
 // 获取目标显示器
 function getTargetDisplay() {
   const displays = screen.getAllDisplays();
-  
+
   if (config.displayId === 'primary') {
     return screen.getPrimaryDisplay();
   }
-  
+
   // 根据显示器ID查找
   const targetDisplay = displays.find(display => display.id.toString() === config.displayId);
   return targetDisplay || screen.getPrimaryDisplay();
@@ -93,10 +93,101 @@ let toolbarView;
 let isPinned = false;
 const TOOLBAR_WIDTH = 56; // 工具栏宽度
 
+// 创建主窗口
+function createMainWindow() {
+  const targetDisplay = getTargetDisplay();
+  const { width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  const { x: screenX, y: screenY } = targetDisplay.bounds;
+
+  mainWindow = new BrowserWindow({
+    width: screenWidth,
+    height: screenHeight,
+    x: screenX,
+    y: screenY,
+    frame: false,
+    transparent: true,
+    hasShadow: false, // 全屏透明窗口不需要自带阴影，由内容自行实现
+    roundedCorners: false, // 全屏窗口不需要圆角
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: true,
+    enableLargerThanScreen: true,
+    type: 'toolbar', // 尝试使用工具栏类型以获得更好的置顶效果
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  // 初始设置为穿透
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  CreateView();
+
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  // 确保窗口大小正确
+  mainWindow.setBounds({
+    x: screenX,
+    y: screenY,
+    width: screenWidth,
+    height: screenHeight
+  });
+
+  mainWindow.on('blur', () => {
+    // 只有当鼠标不在内容区域时才隐藏
+    // 这里由 checkMouse 逻辑处理，blur 事件可能不准确因为点击view也会导致window blur? 
+    // BrowserView 点击通常不会导致 BrowserWindow blur，除非焦点切换到其他应用
+    /*
+    setTimeout(() => {
+      if (!isPinned) {
+        hideMainWindow();
+      }
+    }, 100);
+    */
+  });
+
+  mainWindow.on('close', (event) => {
+    event.preventDefault(); // 退出时通过 quitApp 清理
+    hideMainWindow();
+  });
+}
+
+function updateViewBounds(y) {
+  if (!toolbarView || !view || !mainWindow) return;
+
+  const targetDisplay = getTargetDisplay();
+  const screenWidth = targetDisplay.bounds.width;
+  const { width: contentWidth, height: contentHeight } = getWindowConfigSize();
+
+  // 计算水平居中位置
+  const startX = Math.floor((screenWidth - contentWidth) / 2);
+
+  try {
+    toolbarView.setBounds({
+      x: startX,
+      y: y,
+      width: TOOLBAR_WIDTH,
+      height: contentHeight
+    });
+
+    view.setBounds({
+      x: startX + TOOLBAR_WIDTH,
+      y: y,
+      width: contentWidth - TOOLBAR_WIDTH,
+      height: contentHeight
+    });
+  } catch (e) {
+    console.error('Update bounds failed:', e);
+  }
+}
+
 function CreateView() {
   const targetDisplay = getTargetDisplay();
-  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
-  
+  const { height: windowHeight } = getWindowConfigSize();
+  const screenHeight = targetDisplay.bounds.height;
+
   // 创建工具栏视图
   toolbarView = new BrowserView({
     webPreferences: {
@@ -105,7 +196,7 @@ function CreateView() {
       preload: path.join(__dirname, 'toolbar-preload.js')
     }
   });
-  
+
   // 创建主内容视图
   view = new BrowserView({
     webPreferences: {
@@ -116,73 +207,17 @@ function CreateView() {
       preload: path.join(__dirname, 'preload.js')
     }
   });
-  
+
   mainWindow.setBrowserView(toolbarView);
   mainWindow.addBrowserView(view);
-  
-  // 设置视图边界...
-  toolbarView.setBounds({
-    x: 0,
-    y: 0,
-    width: TOOLBAR_WIDTH,
-    height: windowHeight
-  });
-  
-  const contentWidth = windowWidth - TOOLBAR_WIDTH;
-  view.setBounds({
-    x: TOOLBAR_WIDTH,
-    y: 0,
-    width: contentWidth,
-    height: windowHeight
-  });
-  
+
+  // 初始位置：屏幕底部下方（隐藏）
+  const hiddenY = screenHeight + hiddenOffset;
+  updateViewBounds(hiddenY);
+
   // 加载内容
   toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
   view.webContents.loadURL(config.url);
-}
-
-// 创建主窗口
-function createMainWindow() {
-  const targetDisplay = getTargetDisplay();
-  const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
-  const workArea = targetDisplay.workArea;
-  const { width: windowWidth, height: windowHeight } = getWindowConfigSize();
-  
-  mainWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    frame: false,
-    transparent: true,
-    hasShadow: true,
-    roundedCorners: true,
-    alwaysOnTop: false,
-    skipTaskbar: true,
-    resizable: false,
-    show: true,
-    x: workArea.x + Math.floor((workArea.width - windowWidth) / 2),
-    y: targetDisplay.bounds.y + targetDisplay.bounds.height + hiddenOffset,
-  });
-
-  CreateView();
-
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  
-  mainWindow.on('blur', () => {
-    setTimeout(() => {
-      if (!isPinned) {
-        hideMainWindow();
-      }
-    }, 100);
-  });
-
-  mainWindow.on('close', (event) => {
-    event.preventDefault();
-    hideMainWindow();
-  });
-
-  mainWindow.on('show', () => {
-    //forceAlwaysOnTop();
-  });
 }
 
 // 缓动函数
@@ -201,97 +236,107 @@ const easingFunctions = {
 // 显示主窗口（带动画）
 function showMainWindow() {
   if (!mainWindow || isAnimating) return;
-  
+
   if (hideAnimation) {
     clearInterval(hideAnimation);
     hideAnimation = null;
   }
-  
+
   const targetDisplay = getTargetDisplay();
-  const bounds = targetDisplay.bounds;
-  const { width: windowWidth, height: windowHeight, taskBarHeight: taskBarHeight } = getWindowConfigSize();
-  
-  const centerX = bounds.x + Math.floor((bounds.width - windowWidth) / 2);
-  const targetY = bounds.y + bounds.height - windowHeight - taskBarHeight;
-  console.log(`显示窗口到位置: (${centerX}, ${targetY})`);
-  const hiddenY = bounds.y + bounds.height + hiddenOffset;
-  
-  if (!mainWindow.isVisible()) {
-    mainWindow.setPosition(centerX, hiddenY);
-  }
-  
-   const currentBounds = mainWindow.getBounds();
-  if (currentBounds.y == targetY) {
-    return;
+  const screenHeight = targetDisplay.bounds.height;
+  const { height: contentHeight, taskBarHeight } = getWindowConfigSize();
+
+  // 目标Y坐标：屏幕高度 - 内容高度 - 任务栏高度 (相对于全屏窗口)
+  // 注意：全屏窗口的坐标系原点是屏幕左上角
+  const workArea = targetDisplay.workArea;
+  // 计算相对坐标
+  // 假设全屏窗口覆盖整个 display.bounds
+  // 也就是 y=0 是 display.bounds.y
+  // 底部是 y = screenHeight
+
+  // 通常任务栏在底部，workArea.height < bounds.height
+  const targetY = screenHeight - contentHeight - taskBarHeight;
+
+  // 当前Y坐标
+  let currentY = screenHeight + hiddenOffset;
+  if (toolbarView) {
+    currentY = toolbarView.getBounds().y;
   }
 
-  const startY = currentBounds.y;
+  if (Math.abs(currentY - targetY) < 1) return;
+
   isAnimating = true;
+  const startY = currentY;
   const startTime = Date.now();
   const distance = startY - targetY;
-  
+
   showAnimation = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / ANIMATION_CONFIG.duration, 1);
     const easing = easingFunctions[ANIMATION_CONFIG.easing] || easingFunctions.easeOutCubic;
     const easedProgress = easing(progress);
-    const currentY = Math.round(startY - distance * easedProgress);
-    
-    mainWindow.setPosition(centerX, currentY);
-    console.log(`动画进度: ${progress.toFixed(2)}, 位置: (${centerX}, ${currentY}), 窗口大小: ${mainWindow.getBounds().width}x${mainWindow.getBounds().height}`);
-    
+
+    const newY = Math.round(startY - distance * easedProgress);
+    updateViewBounds(newY);
+
     if (progress >= 1) {
       clearInterval(showAnimation);
       showAnimation = null;
       isAnimating = false;
-      mainWindow.setPosition(centerX, targetY);
+      updateViewBounds(targetY);
+      // 动画结束，强制置顶一次
+      forceAlwaysOnTop();
     }
   }, 1000 / ANIMATION_CONFIG.fps);
 }
 
-// 隐藏主窗口（带动画）- 移动到屏幕外而不是hide
+// 隐藏主窗口（带动画）
 function hideMainWindow() {
   if (!mainWindow || isAnimating) return;
-  
+
   const targetDisplay = getTargetDisplay();
-  const bounds = targetDisplay.bounds;
-  const hiddenY = bounds.y + bounds.height + hiddenOffset;
-  const currentBounds = mainWindow.getBounds();
-  
-  if (currentBounds.y == hiddenY) {
-    return;
+  const screenHeight = targetDisplay.bounds.height;
+  const hiddenY = screenHeight + hiddenOffset;
+
+  let currentY = hiddenY;
+  if (toolbarView) {
+    currentY = toolbarView.getBounds().y;
   }
-  
+
+  if (Math.abs(currentY - hiddenY) < 1) return;
+
   if (showAnimation) {
     clearInterval(showAnimation);
     showAnimation = null;
   }
-  
-  const startY = currentBounds.y;
+
+  const startY = currentY;
   const targetY = hiddenY;
-  
+
   isAnimating = true;
   const startTime = Date.now();
   const distance = targetY - startY;
-  
+
   hideAnimation = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / ANIMATION_CONFIG.duration, 1);
     const easing = easingFunctions.easeInOutCubic;
     const easedProgress = easing(progress);
-    const currentY = Math.round(startY + distance * easedProgress);
-    mainWindow.setPosition(currentBounds.x, currentY);
+    // 隐藏时向下移动
+    const newY = Math.round(startY + distance * easedProgress);
+
+    updateViewBounds(newY);
+
     if (progress >= 1) {
       clearInterval(hideAnimation);
       hideAnimation = null;
       isAnimating = false;
-      const {width:windowWidth, height:windowHeight} = getWindowConfigSize();
-      mainWindow.setBounds(currentBounds.x, targetY, windowWidth, windowHeight);
+      updateViewBounds(targetY);
     }
   }, 1000 / ANIMATION_CONFIG.fps);
 }
 
-function getWindowConfigSize(){
+function getWindowConfigSize() {
   // 不知道为什么，副屏上workarea一会儿扣除任务栏高度，一会儿不扣，我服了，之前写的从主屏获取任务栏的处理现在暂时注释掉
 
   const targetDisplay = getTargetDisplay();
@@ -301,7 +346,7 @@ function getWindowConfigSize(){
   const workArea = targetDisplay.workArea;
   const screenWidth = targetDisplay.bounds.width;
   const screenHeight = targetDisplay.bounds.height;
-  
+
   const taskBarHeight = screenHeight - workArea.height; //primaryDisplay.bounds.height - primaryDisplay.workArea.height
 
   let windowWidth = Math.floor(workArea.width * config.width / 100);
@@ -333,7 +378,7 @@ function getAnimationConfig() {
 
 // 清理函数（在应用退出时调用）
 function cleanupAnimations() {
-   if (showAnimation) {
+  if (showAnimation) {
     clearInterval(showAnimation);
     showAnimation = null;
   }
@@ -394,7 +439,7 @@ function createSettingsWindow() {
       primary: display.id === screen.getPrimaryDisplay().id,
       selected: display.id === getTargetDisplay().id
     }));
-    
+
     settingsWindow.webContents.send('load-config', config);
     settingsWindow.webContents.send('load-displays', displays);
   });
@@ -403,10 +448,10 @@ function createSettingsWindow() {
 // 创建系统托盘
 function createTray() {
   // 使用简单的图标，你可以替换为自己的图标文件
-  const iconPath = process.platform === 'win32' 
+  const iconPath = process.platform === 'win32'
     ? path.join(__dirname, '../assets/icon.ico')
     : path.join(__dirname, '../assets/icon.png');
-  
+
   // 如果图标文件不存在，创建一个简单的
   if (!fs.existsSync(iconPath)) {
     const iconDir = path.dirname(iconPath);
@@ -447,15 +492,15 @@ function quitApp() {
   // 1. 销毁所有窗口
   cleanupAnimations();
   BrowserWindow.getAllWindows().forEach(win => win.destroy())
-        
+
   // 2. 清理系统托盘
   tray.destroy()
-  
+
   // 3. macOS 额外处理
   if (process.platform === 'darwin') {
     app.dock.hide()
   }
-  
+
   // 4. 强制退出
   process.nextTick(() => app.exit(0))
 }
@@ -465,83 +510,126 @@ let hideTimer = null;
 let showTimer = null;
 let mouseCheckTimer = null;
 
-// 检查窗口是否在可见区域
-function isWindowVisible() {
-  if (!mainWindow) return false;
-  
+// 检查内容是否可见
+function isContentVisible() {
+  if (!toolbarView) return false;
+  const bounds = toolbarView.getBounds();
   const targetDisplay = getTargetDisplay();
-  const { y: screenY, height: screenHeight } = targetDisplay.bounds;
-  const windowBounds = mainWindow.getBounds();
-  
-  // 如果窗口底部在屏幕底部以上，认为是可见的
-  return windowBounds.y < screenY + screenHeight;
+  const screenHeight = targetDisplay.bounds.height;
+
+  // 只要由于 visible region 在屏幕内
+  // bounds.y 是相对于窗口(即相对于屏幕)的顶部的距离
+  // 如果 bounds.y < screenHeight，说明至少露出了一点
+  return bounds.y < screenHeight;
 }
 
 function startMouseTracking() {
   if (isMouseTracking) return;
-  
+
   isMouseTracking = true;
-  
+
   const checkMouse = () => {
     if (!isMouseTracking) return;
-    
+
     const mousePos = screen.getCursorScreenPoint();
     const targetDisplay = getTargetDisplay();
     const { x: screenX, y: screenY, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
     const workArea = targetDisplay.workArea;
-    
+
     // 检查鼠标是否在目标显示器上
-    const mouseOnTargetDisplay = mousePos.x >= screenX && 
-                                 mousePos.x < screenX + screenWidth &&
-                                 mousePos.y >= screenY && 
-                                 mousePos.y < screenY + screenHeight;
-    
+    const mouseOnTargetDisplay = mousePos.x >= screenX &&
+      mousePos.x < screenX + screenWidth &&
+      mousePos.y >= screenY &&
+      mousePos.y < screenY + screenHeight;
+
+    // 计算相对鼠标位置（相对于目标显示器左上角）
+    const relMouseX = mousePos.x - screenX;
+    const relMouseY = mousePos.y - screenY;
+
+    // --- 穿透逻辑处理 ---
+    let shouldIgnoreMouse = true;
+    if (mouseOnTargetDisplay && toolbarView && view) {
+      const tbBounds = toolbarView.getBounds();
+      const vBounds = view.getBounds();
+
+      // 合并 bounds (这是内容区域)
+      // 注意：bounds 已经是相对于全屏窗口（即相对于显示器的原点）
+      const isInContent = (
+        (relMouseX >= tbBounds.x && relMouseX <= tbBounds.x + tbBounds.width &&
+          relMouseY >= tbBounds.y && relMouseY <= tbBounds.y + tbBounds.height) ||
+        (relMouseX >= vBounds.x && relMouseX <= vBounds.x + vBounds.width &&
+          relMouseY >= vBounds.y && relMouseY <= vBounds.y + vBounds.height)
+      );
+
+      if (isInContent) {
+        shouldIgnoreMouse = false;
+      }
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        // 只有当状态改变时才调用，避免频繁 IPC
+        // Electron 没有直接获取当前 ignore状态的API，所以直接设置，但可以优化频率
+        // 实际上频繁设置开销不大，但为保险起见，每帧设置也可以
+        // setIgnoreMouseEvents(ignore, options)
+        // ignore: true 表示穿透
+        mainWindow.setIgnoreMouseEvents(shouldIgnoreMouse, { forward: true });
+      } catch (e) {
+        // ignore
+      }
+    }
+    // -------------------
+
     // 检查是否在触发区域（使用工作区域底部）
-    const inTriggerZone = mouseOnTargetDisplay && 
-                         (workArea.y + screenHeight - mousePos.y) <= config.triggerDistance;
-    
+    const inTriggerZone = mouseOnTargetDisplay &&
+      (workArea.y + screenHeight - mousePos.y) <= config.triggerDistance;
+
+    const visible = isContentVisible();
+
     if (inTriggerZone && !isAnimating) {
       // 清除隐藏计时器
       if (hideTimer) {
         clearTimeout(hideTimer);
         hideTimer = null;
       }
-      
+
       // 延迟显示，避免误触发
-      if (!isWindowVisible() && !showTimer) {
+      if (!visible && !showTimer) {
         showTimer = setTimeout(() => {
           showMainWindow();
           showTimer = null;
-        }, 100); // 减少延迟，因为动画本身有过渡效果
+        }, 100);
       }
-    } else if (isWindowVisible() && !isAnimating) {
+    } else if (visible && !isAnimating) {
       // 清除显示计时器
       if (showTimer) {
         clearTimeout(showTimer);
         showTimer = null;
       }
-      
-      // 检查鼠标是否离开了窗口区域
-      const windowBounds = mainWindow.getBounds();
-      const buffer = 20; // 缓冲区域
-      const mouseOutsideWindow = mousePos.x < windowBounds.x - buffer || 
-                                mousePos.x > windowBounds.x + windowBounds.width + buffer ||
-                                mousePos.y < windowBounds.y - buffer || 
-                                mousePos.y > windowBounds.y + windowBounds.height + buffer;
 
-      if (mouseOutsideWindow) {
+      // 检查鼠标是否离开了内容区域
+      // 使用上面的 shouldIgnoreMouse 逻辑的反义：if shouldIgnoreMouse is true, then we are outside content
+      const mouseOutsideContent = shouldIgnoreMouse;
+
+      if (mouseOutsideContent) {
         // 延迟隐藏，给用户时间移回窗口
-        if (!hideTimer && !isPinned) { // 添加 !isPinned 条件
+        if (!hideTimer && !isPinned) {
           hideTimer = setTimeout(() => {
             hideMainWindow();
             hideTimer = null;
-          }, 200); // 稍微增加延迟，配合动画效果
+          }, 300); // 增加一点延迟
+        }
+      } else {
+        // 鼠标在内容内，清除隐藏计时器
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
         }
       }
     }
-    mouseCheckTimer = setTimeout(checkMouse, 100); // 提高检测频率以获得更流畅的体验
+    mouseCheckTimer = setTimeout(checkMouse, 50); // 50ms 频率，保证穿透切换灵敏
   };
-  
+
   checkMouse();
 }
 
@@ -567,25 +655,35 @@ ipcMain.handle('open-external', async (event, url) => {
 ipcMain.handle('save-config', (event, newConfig) => {
   config = { ...config, ...newConfig };
   saveConfig();
-  
+
   // 重新加载主窗口
   if (mainWindow) {
     // 重新设置窗口大小
     const targetDisplay = getTargetDisplay();
-    const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
+    // 使用 bounds 确保全屏覆盖
+    const { width: screenWidth, height: screenHeight } = targetDisplay.bounds;
     const { x: screenX, y: screenY } = targetDisplay.bounds;
-    const {width:windowWidth, height:windowHeight, taskBarHeight: taskBarHeight} = getWindowConfigSize();
-    
-    // 计算位置
-    const x = screenX + Math.floor((screenWidth - windowWidth) / 2);
-    const targetY = screenY + screenHeight - windowHeight; // 目标位置（显示状态）
-    const hiddenY = screenY + screenHeight + hiddenOffset; // 隐藏位置
 
-    mainWindow.setBounds(x, hiddenY, windowWidth, windowHeight);
-    CreateView();
-    console.log(`窗口大小已更新: ${windowWidth}x${windowHeight}`);
+    // 获取新的内容配置尺寸
+    const { width: contentWidth, height: contentHeight, taskBarHeight } = getWindowConfigSize();
+
+    // 全屏设置主窗口
+    mainWindow.setBounds({ x: screenX, y: screenY, width: screenWidth, height: screenHeight });
+
+    // 更新内容 View 大小和位置
+    // 如果当前是显示的，更新到新的显示位置
+    if (isContentVisible()) {
+      // 相对于全屏窗口顶部的位置
+      const targetY = screenHeight - contentHeight - taskBarHeight;
+      updateViewBounds(targetY);
+    } else {
+      const hiddenY = screenHeight + hiddenOffset;
+      updateViewBounds(hiddenY);
+    }
+
+    console.log(`配置更新: 全屏窗口 ${screenWidth}x${screenHeight}, 内容区域 ${contentWidth}x${contentHeight}`);
   }
-  
+
   return true;
 });
 
@@ -609,11 +707,11 @@ ipcMain.handle('toolbar-quit', () => {
 // 应用事件
 app.whenReady().then(() => {
   loadConfig();
-  
+
   if (!fs.existsSync(configPath)) {
     createSettingsWindow();
   }
-  
+
   createMainWindow();
   createTray();
   startMouseTracking();
