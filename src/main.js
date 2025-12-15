@@ -3,11 +3,14 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
-let view;
+let contentViews = []; // Currently displayed content views
+let pageViewCache = new Map(); // Cache of all page views: Map<index, BrowserView[]>
 let settingsWindow;
 let tray;
 let config = {};
+
 let isMouseTracking = false;
+let activePageIndex = 0; // Current active page index
 
 // 动画控制变量
 let showAnimation = null;
@@ -24,7 +27,11 @@ const ANIMATION_CONFIG = {
 
 // 默认配置
 const defaultConfig = {
-  url: 'https://github.com/titidatiti/PatchyCloud',
+  // Config migration: urls -> pages
+  // New structure: pages: [ { urls: [...] }, ... ]
+  pages: [
+    { urls: ['https://github.com/titidatiti/PatchyCloud'] }
+  ],
   width: 50, // 百分比
   height: 50, // 百分比
   triggerDistance: 10, // 像素
@@ -38,7 +45,28 @@ const configPath = path.join(app.getPath('userData'), 'config.json');
 function loadConfig() {
   try {
     if (fs.existsSync(configPath)) {
-      config = { ...defaultConfig, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
+      const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      config = { ...defaultConfig, ...savedConfig };
+
+      // Configuration Migration
+      if (!config.pages) {
+        config.pages = [];
+
+        // Migrate 'urls' (previous version)
+        if (savedConfig.urls && Array.isArray(savedConfig.urls)) {
+          config.pages.push({ urls: savedConfig.urls });
+        }
+        // Migrate 'url' (very old version)
+        else if (savedConfig.url) {
+          config.pages.push({ urls: [savedConfig.url] });
+        }
+      }
+
+      // Ensure at least one page exists
+      if (config.pages.length === 0) {
+        config.pages.push({ urls: defaultConfig.pages[0].urls });
+      }
+
     } else {
       config = { ...defaultConfig };
     }
@@ -155,7 +183,7 @@ function createMainWindow() {
 }
 
 function updateViewBounds(y) {
-  if (!toolbarView || !view || !mainWindow) return;
+  if (!toolbarView || !mainWindow) return;
 
   const targetDisplay = getTargetDisplay();
   const screenWidth = targetDisplay.bounds.width;
@@ -172,52 +200,148 @@ function updateViewBounds(y) {
       height: contentHeight
     });
 
-    view.setBounds({
-      x: startX + TOOLBAR_WIDTH,
-      y: y,
-      width: contentWidth - TOOLBAR_WIDTH,
-      height: contentHeight
-    });
+    if (contentViews.length > 0) {
+      const totalContentWidth = contentWidth - TOOLBAR_WIDTH;
+      const viewWidth = Math.floor(totalContentWidth / contentViews.length);
+
+      contentViews.forEach((view, index) => {
+        // Adjust last view width to fill remaining space (avoid rounding gaps)
+        const currentViewWidth = (index === contentViews.length - 1)
+          ? (totalContentWidth - viewWidth * (contentViews.length - 1))
+          : viewWidth;
+
+        view.setBounds({
+          x: startX + TOOLBAR_WIDTH + (index * viewWidth),
+          y: y,
+          width: currentViewWidth,
+          height: contentHeight
+        });
+      });
+    }
   } catch (e) {
     console.error('Update bounds failed:', e);
   }
 }
 
+// Helper to clean up all cached views (e.g. on config change)
+function destroyAllCachedViews() {
+  pageViewCache.forEach(views => {
+    views.forEach(v => {
+      // Important: Destroying webContents stops the renderer process
+      try { if (!v.webContents.isDestroyed()) v.webContents.destroy(); } catch (e) { }
+    });
+  });
+  pageViewCache.clear();
+  contentViews = [];
+}
+
 function CreateView() {
   const targetDisplay = getTargetDisplay();
-  const { height: windowHeight } = getWindowConfigSize();
   const screenHeight = targetDisplay.bounds.height;
 
-  // 创建工具栏视图
-  toolbarView = new BrowserView({
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'toolbar-preload.js')
+  // 1. Detach current content views (do not destroy, just remove from window)
+  contentViews.forEach(v => {
+    if (mainWindow) {
+      try { mainWindow.removeBrowserView(v); } catch (e) { }
     }
   });
+  contentViews = [];
 
-  // 创建主内容视图
-  view = new BrowserView({
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      webSecurity: false,
-      preload: path.join(__dirname, 'preload.js')
+  // 2. Manage Toolbar View (Ensure it exists and is attached)
+  // We don't cache/destroy toolbar view on page switch, it stays alive.
+  if (!toolbarView || toolbarView.webContents.isDestroyed()) {
+    toolbarView = new BrowserView({
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'toolbar-preload.js')
+      }
+    });
+    toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
+  }
+
+  // Ensure toolbar is attached (it might have been removed if we are strict, 
+  // but let's just add it back to be safe or check if attached? 
+  // Electron doesn't have 'isAttached', so setBrowserView overwrites? 
+  // mainWindow.setBrowserView(toolbarView) sets ONE view. 
+  // We use addBrowserView. 
+  // Best practice: remove all, add all.
+  if (mainWindow) {
+    // Determine if we need to re-add toolbar. 
+    // Simplest is to remove it and add it back to ensure Z-order or just ensure it is in the list.
+    // However, removing toolbar might flicker. 
+    // Let's try to NOT remove toolbar if possible.
+    // But we need to ensure content views are managed.
+    // Let's just re-add it.
+    try { mainWindow.addBrowserView(toolbarView); } catch (e) { }
+  }
+
+  // 3. Get or Create Content Views for Active Page
+  if (pageViewCache.has(activePageIndex)) {
+    // Use cached views
+    contentViews = pageViewCache.get(activePageIndex);
+  } else {
+    // Create new views
+    const activePage = config.pages[activePageIndex];
+    const urls = activePage ? activePage.urls : [];
+    const newViews = [];
+
+    urls.forEach(url => {
+      const v = new BrowserView({
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          enableRemoteModule: false,
+          webSecurity: false,
+          preload: path.join(__dirname, 'preload.js')
+        }
+      });
+      v.setBackgroundColor('#1a1a1a');
+      v.webContents.loadURL(url);
+      newViews.push(v);
+    });
+
+    // Fallback?
+
+    pageViewCache.set(activePageIndex, newViews);
+    contentViews = newViews;
+  }
+
+  // 4. Attach Content Views
+  if (mainWindow) {
+    // Note: setBrowserView destroys others? No, it replaces 'the' browser view. 
+    // We should use addBrowserView for multiple. 
+    // But historically we might have used setBrowserView for toolbar?
+    // Let's use setBrowserView(null) to clear? No.
+    // We just add them.
+    contentViews.forEach(v => mainWindow.addBrowserView(v));
+
+    // Send page info to toolbar
+    // Check if toolbar is ready?
+    if (toolbarView.webContents && !toolbarView.webContents.isLoading()) {
+      toolbarView.webContents.send('update-pages', {
+        count: config.pages.length,
+        active: activePageIndex
+      });
+    } else if (toolbarView.webContents) {
+      toolbarView.webContents.once('did-finish-load', () => {
+        toolbarView.webContents.send('update-pages', {
+          count: config.pages.length,
+          active: activePageIndex
+        });
+      });
     }
-  });
+  }
 
-  mainWindow.setBrowserView(toolbarView);
-  mainWindow.addBrowserView(view);
-
-  // 初始位置：屏幕底部下方（隐藏）
-  const hiddenY = screenHeight + hiddenOffset;
-  updateViewBounds(hiddenY);
-
-  // 加载内容
-  toolbarView.webContents.loadFile(path.join(__dirname, 'toolbar.html'));
-  view.webContents.loadURL(config.url);
+  // 5. Initial Position (Hidden)
+  // Only update bounds if this is a fresh creation or force update?
+  // We usually call updateViewBounds immediately after this.
+  // const hiddenY = screenHeight + hiddenOffset;
+  // updateViewBounds(hiddenY); 
+  // No, let caller handle visibility to avoid flickering?
+  // Original code did updateViewBounds(hiddenY).
+  // Let's do it to be safe, but we might want to keep it visible if we are just switching pages and window is open.
+  // We'll let the switch handler decide.
 }
 
 // 缓动函数
@@ -409,7 +533,7 @@ function createSettingsWindow() {
   }
 
   settingsWindow = new BrowserWindow({
-    width: 520,
+    width: 900,
     height: 720,
     frame: false, // 无边框
     roundedCorners: true,
@@ -548,18 +672,23 @@ function startMouseTracking() {
 
     // --- 穿透逻辑处理 ---
     let shouldIgnoreMouse = true;
-    if (mouseOnTargetDisplay && toolbarView && view) {
+    if (mouseOnTargetDisplay && toolbarView) {
       const tbBounds = toolbarView.getBounds();
-      const vBounds = view.getBounds();
-
-      // 合并 bounds (这是内容区域)
-      // 注意：bounds 已经是相对于全屏窗口（即相对于显示器的原点）
-      const isInContent = (
-        (relMouseX >= tbBounds.x && relMouseX <= tbBounds.x + tbBounds.width &&
-          relMouseY >= tbBounds.y && relMouseY <= tbBounds.y + tbBounds.height) ||
-        (relMouseX >= vBounds.x && relMouseX <= vBounds.x + vBounds.width &&
-          relMouseY >= vBounds.y && relMouseY <= vBounds.y + vBounds.height)
+      let isInContent = (
+        relMouseX >= tbBounds.x && relMouseX <= tbBounds.x + tbBounds.width &&
+        relMouseY >= tbBounds.y && relMouseY <= tbBounds.y + tbBounds.height
       );
+
+      if (!isInContent) {
+        for (const v of contentViews) {
+          const vBounds = v.getBounds();
+          if (relMouseX >= vBounds.x && relMouseX <= vBounds.x + vBounds.width &&
+            relMouseY >= vBounds.y && relMouseY <= vBounds.y + vBounds.height) {
+            isInContent = true;
+            break;
+          }
+        }
+      }
 
       if (isInContent) {
         shouldIgnoreMouse = false;
@@ -648,7 +777,11 @@ function stopMouseTracking() {
 }
 
 // IPC事件处理
-ipcMain.handle('get-config', () => config);
+ipcMain.handle('get-config', () => {
+  // Merge runtime 'openAtLogin' status
+  const openAtLogin = app.getLoginItemSettings().openAtLogin;
+  return { ...config, openAtLogin };
+});
 
 // 新增：在主进程处理 open-external，使用 shell.openExternal 打开系统浏览器
 ipcMain.handle('open-external', async (event, url) => {
@@ -662,7 +795,23 @@ ipcMain.handle('open-external', async (event, url) => {
 });
 
 ipcMain.handle('save-config', (event, newConfig) => {
-  config = { ...config, ...newConfig };
+  // Handle start on boot
+  if (typeof newConfig.openAtLogin === 'boolean') {
+    app.setLoginItemSettings({
+      openAtLogin: newConfig.openAtLogin,
+      path: app.getPath('exe') // Optional, but good practice
+    });
+    // Don't save this to config.json as it's a system setting, or do?
+    // Usually good to keep config.json pure if we use file sync, 
+    // but here we just return it in get-config.
+    // We can strip it from config object before saving to file.
+  }
+
+  // Create clean config for file
+  const configToSave = { ...newConfig };
+  delete configToSave.openAtLogin;
+
+  config = { ...config, ...configToSave };
   saveConfig();
 
   // 重新加载主窗口
@@ -679,21 +828,63 @@ ipcMain.handle('save-config', (event, newConfig) => {
     // 全屏设置主窗口
     mainWindow.setBounds({ x: screenX, y: screenY, width: screenWidth, height: screenHeight });
 
-    // 更新内容 View 大小和位置
-    // 如果当前是显示的，更新到新的显示位置
+    // Validate activePageIndex
+    if (activePageIndex >= config.pages.length) {
+      activePageIndex = 0;
+    }
+
+    // Clear cache because config (URLs) might have changed
+    destroyAllCachedViews();
+
+    // Recreate views to reflect new configuration (especially if URL count or display changed)
+    CreateView();
+
+    // 更新内容 View 大小和位置 (CreateView internally calls updateViewBounds with hiddenY, so we might need to force update if it should be visible)
+    // Actually CreateView resets to hidden position. If we want to keep it visible if it was visible, we need extra logic.
+    // For simplicity, let's just reset to hidden state or show it if it should be shown?
+    // Users probably expect it to update in place.
+    // But CreateView makes them hidden.
+    // Let's force update.
+
     if (isContentVisible()) {
-      // 相对于全屏窗口顶部的位置
       const targetY = screenHeight - contentHeight - taskBarHeight;
       updateViewBounds(targetY);
     } else {
-      const hiddenY = screenHeight + hiddenOffset;
-      updateViewBounds(hiddenY);
+      // If it was hidden, CreateView already set it to hiddenY
     }
 
     console.log(`配置更新: 全屏窗口 ${screenWidth}x${screenHeight}, 内容区域 ${contentWidth}x${contentHeight}`);
   }
 
   return true;
+});
+
+ipcMain.handle('toolbar-switch-page', (event, index) => {
+  if (index >= 0 && index < config.pages.length) {
+    const wasVisible = isContentVisible();
+
+    activePageIndex = index;
+
+    // Recreate content views for the new page
+    CreateView();
+
+    // Update visibility
+    const targetDisplay = getTargetDisplay();
+    const screenHeight = targetDisplay.bounds.height;
+    const { height: contentHeight, taskBarHeight } = getWindowConfigSize();
+
+    // Force update if it was visible OR if we just clicked the toolbar (sanity check)
+    // Since user clicked toolbar, it MUST have been visible. 
+    // But relying on wasVisible is safer if CreateView messes up isContentVisible.
+    if (wasVisible || true) {
+      const targetY = screenHeight - contentHeight - taskBarHeight;
+      updateViewBounds(targetY);
+    } else {
+      // Keep hidden
+    }
+    return true;
+  }
+  return false;
 });
 
 ipcMain.handle('toolbar-toggle-pin', () => {
