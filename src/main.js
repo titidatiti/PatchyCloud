@@ -352,7 +352,7 @@ function getWindowConfigSize() {
   let windowWidth = Math.floor(workArea.width * config.width / 100);
   let windowHeight = Math.floor(workArea.height * config.height / 100);
 
-  console.log(`计算窗口大小: ${windowWidth}x${windowHeight} (屏幕: ${screenWidth}x${screenHeight}, 工作区: ${workArea.width}x${workArea.height}, 任务栏高度: ${taskBarHeight})`);
+  // console.log(`计算窗口大小: ${windowWidth}x${windowHeight} (屏幕: ${screenWidth}x${screenHeight}, 工作区: ${workArea.width}x${workArea.height}, 任务栏高度: ${taskBarHeight})`);
 
   return {
     width: windowWidth,
@@ -611,7 +611,16 @@ function startMouseTracking() {
       // 使用上面的 shouldIgnoreMouse 逻辑的反义：if shouldIgnoreMouse is true, then we are outside content
       const mouseOutsideContent = shouldIgnoreMouse;
 
-      if (mouseOutsideContent) {
+      // 检查鼠标是否在任务栏区域（在屏幕内但不在工作区内）
+      const isMouseInTaskbar = mouseOnTargetDisplay && !(
+        mousePos.x >= workArea.x &&
+        mousePos.x < workArea.x + workArea.width &&
+        mousePos.y >= workArea.y &&
+        mousePos.y < workArea.y + workArea.height
+      );
+
+      // 如果鼠标在内容区域外，且不在任务栏区域，才隐藏
+      if (mouseOutsideContent && !isMouseInTaskbar) {
         // 延迟隐藏，给用户时间移回窗口
         if (!hideTimer && !isPinned) {
           hideTimer = setTimeout(() => {
@@ -620,7 +629,7 @@ function startMouseTracking() {
           }, 300); // 增加一点延迟
         }
       } else {
-        // 鼠标在内容内，清除隐藏计时器
+        // 鼠标在内容内或在任务栏，清除隐藏计时器
         if (hideTimer) {
           clearTimeout(hideTimer);
           hideTimer = null;
