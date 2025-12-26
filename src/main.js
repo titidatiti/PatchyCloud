@@ -30,7 +30,7 @@ const defaultConfig = {
   // Config migration: urls -> pages
   // New structure: pages: [ { urls: [...] }, ... ]
   pages: [
-    { urls: ['https://github.com/titidatiti/PatchyCloud'] }
+    { items: [{ url: 'https://github.com/titidatiti/PatchyCloud', width: 100 }] }
   ],
   width: 50, // 百分比
   height: 50, // 百分比
@@ -64,7 +64,7 @@ function loadConfig() {
 
       // Ensure at least one page exists
       if (config.pages.length === 0) {
-        config.pages.push({ urls: defaultConfig.pages[0].urls });
+        config.pages.push(JSON.parse(JSON.stringify(defaultConfig.pages[0])));
       }
 
     } else {
@@ -202,20 +202,48 @@ function updateViewBounds(y) {
 
     if (contentViews.length > 0) {
       const totalContentWidth = contentWidth - TOOLBAR_WIDTH;
-      const viewWidth = Math.floor(totalContentWidth / contentViews.length);
+
+      // Get widths from active page config
+      const activePage = config.pages[activePageIndex];
+      let items = []; /* activePage.items or derived */
+      if (activePage) {
+        if (activePage.items) items = activePage.items;
+        else if (activePage.urls) items = activePage.urls.map(u => ({ width: 0 }));
+      }
+
+      // If we don't have enough width info, fallback to equal split
+      // But CreateView ensures items match views usually
+
+      let currentX = startX + TOOLBAR_WIDTH;
 
       contentViews.forEach((view, index) => {
-        // Adjust last view width to fill remaining space (avoid rounding gaps)
-        const currentViewWidth = (index === contentViews.length - 1)
-          ? (totalContentWidth - viewWidth * (contentViews.length - 1))
-          : viewWidth;
+        // Calculate width based on percentage
+        let percentage = 0;
+        if (items[index] && items[index].width) {
+          percentage = items[index].width;
+        } else {
+          // Fallback: distribute remaining or equal?
+          // If completely missing, 100 / count
+          percentage = 100 / contentViews.length;
+        }
+
+        let widthPx = Math.floor(totalContentWidth * percentage / 100);
+
+        // Adjust last view width to fill remaining space
+        if (index === contentViews.length - 1) {
+          widthPx = (startX + TOOLBAR_WIDTH + totalContentWidth) - currentX;
+          // Protect against negative width
+          if (widthPx < 0) widthPx = 0;
+        }
 
         view.setBounds({
-          x: startX + TOOLBAR_WIDTH + (index * viewWidth),
+          x: currentX,
           y: y,
-          width: currentViewWidth,
+          width: widthPx,
           height: contentHeight
         });
+
+        currentX += widthPx;
       });
     }
   } catch (e) {
@@ -283,10 +311,23 @@ function CreateView() {
   } else {
     // Create new views
     const activePage = config.pages[activePageIndex];
-    const urls = activePage ? activePage.urls : [];
+    // Handle both items (new) and urls (old)
+    let pageItems = [];
+    if (activePage) {
+      if (activePage.items) {
+        pageItems = activePage.items;
+      } else if (activePage.urls) {
+        // Migration / Fallback
+        pageItems = activePage.urls.map(u => ({ url: u, width: 100 / activePage.urls.length }));
+      }
+    }
+
     const newViews = [];
 
-    urls.forEach(url => {
+    pageItems.forEach(item => {
+      const url = (typeof item === 'string') ? item : item.url;
+      if (!url) return;
+
       const v = new BrowserView({
         webPreferences: {
           nodeIntegration: false,
