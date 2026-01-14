@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, Tray, Menu, screen, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, BrowserView, Tray, Menu, screen, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -177,6 +177,9 @@ function createMainWindow() {
   });
 
   mainWindow.on('close', (event) => {
+    if (isQuitting) {
+      return;
+    }
     event.preventDefault(); // 退出时通过 quitApp 清理
     hideMainWindow();
   });
@@ -634,7 +637,21 @@ function createTray() {
     tray = new Tray(path.join(__dirname, '../assets/default-icon.png'));
   }
 
+  const menuIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+
   const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '啪唧云菜单 PatchyCloud',
+      icon: menuIcon,
+      click: () => {
+        shell.openExternal('https://github.com/titidatiti/PatchyCloud');
+      }
+    },
+    {
+      label: `版本号: ${app.getVersion()}`,
+      enabled: false
+    },
+    { type: 'separator' },
     {
       label: '自定义设置',
       click: () => {
@@ -959,10 +976,18 @@ app.whenReady().then(() => {
   forceAlwaysOnTop();
 });
 
+// 全局变量控制退出状态
+let isQuitting = false;
+
 app.on('window-all-closed', (event) => {
-  event.preventDefault(); // 阻止应用退出
+  // 如果不是正在退出（例如系统关机），则阻止默认退出行为
+  // 这样可以保持应用在后台运行（如果需要的话，虽然当前逻辑主要依赖 mainWindow 的 hide）
+  if (!isQuitting) {
+    event.preventDefault();
+  }
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   stopMouseTracking();
 });
