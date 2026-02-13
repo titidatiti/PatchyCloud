@@ -232,6 +232,10 @@
 
       <div class="spacer" aria-hidden="true"></div>
 
+      <div id="refresh" class="btn" title="刷新页面" aria-label="刷新页面">
+        <span class="material-icons" aria-hidden="true">refresh</span>
+      </div>
+
       <div id="quit" class="btn" title="退出" aria-label="退出">
         <span class="material-icons" aria-hidden="true">exit_to_app</span>
       </div>
@@ -242,6 +246,7 @@
     const logoBtn = document.getElementById('logo');
     const pinBtn = document.getElementById('pin');
     const settingsBtn = document.getElementById('settings');
+    const refreshBtn = document.getElementById('refresh');
     const quitBtn = document.getElementById('quit');
 
     logoBtn.addEventListener('click', async () => {
@@ -262,6 +267,7 @@
     });
 
     settingsBtn.addEventListener('click', async () => { await window.electronAPI.openSettings(); });
+    refreshBtn.addEventListener('click', async () => { await window.electronAPI.refreshPage(); });
     quitBtn.addEventListener('click', async () => { await window.electronAPI.quitApp(); });
     // Page Navigation Logic
     window.electronAPI.onUpdatePages((event, data) => {

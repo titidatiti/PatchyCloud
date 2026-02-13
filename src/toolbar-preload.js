@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.invoke('toolbar-quit'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   switchPage: (index) => ipcRenderer.invoke('toolbar-switch-page', index),
+  refreshPage: () => ipcRenderer.invoke('toolbar-refresh-page'),
   onUpdatePages: (callback) => ipcRenderer.on('update-pages', callback)
 });

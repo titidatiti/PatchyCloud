@@ -958,6 +958,17 @@ ipcMain.handle('toolbar-open-settings', () => {
   createSettingsWindow();
 });
 
+ipcMain.handle('toolbar-refresh-page', () => {
+  if (contentViews && contentViews.length > 0) {
+    contentViews.forEach(view => {
+      // Check if view and webContents exist to avoid errors
+      if (view && view.webContents && !view.webContents.isDestroyed()) {
+        view.webContents.reload();
+      }
+    });
+  }
+});
+
 ipcMain.handle('toolbar-quit', () => {
   quitApp();
 });
