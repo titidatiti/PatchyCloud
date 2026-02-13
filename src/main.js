@@ -412,13 +412,15 @@ function CreateView() {
     if (toolbarView.webContents && !toolbarView.webContents.isLoading()) {
       toolbarView.webContents.send('update-pages', {
         count: config.pages.length,
-        active: activePageIndex
+        active: activePageIndex,
+        pages: config.pages // Send full pages config
       });
     } else if (toolbarView.webContents) {
       toolbarView.webContents.once('did-finish-load', () => {
         toolbarView.webContents.send('update-pages', {
           count: config.pages.length,
-          active: activePageIndex
+          active: activePageIndex,
+          pages: config.pages // Send full pages config
         });
       });
     }

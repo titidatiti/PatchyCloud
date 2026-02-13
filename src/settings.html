@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>设置</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         :root {
             /* Dark Mode Variables */
@@ -123,7 +124,8 @@
         }
 
         .form-group input,
-        .form-group select {
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 8px 10px;
             border: 1px solid var(--input-border);
@@ -132,10 +134,13 @@
             transition: all 0.2s;
             background: var(--input-bg);
             color: var(--text-color);
+            font-family: inherit;
+            /* Ensure textarea uses same font */
         }
 
         .form-group input:focus,
-        .form-group select:focus {
+        .form-group select:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: var(--accent-color);
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
@@ -218,7 +223,7 @@
             min-height: 0;
         }
 
-        .right-col .form-group {
+        .right-col>.form-group {
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -453,13 +458,171 @@
             opacity: 0.7;
             pointer-events: none;
         }
+
+        /* Accordion Style */
+        .accordion {
+            background: transparent;
+            /* border: 1px solid var(--input-border); */
+            border-radius: 6px;
+            margin-top: 20px;
+            /* overflow: hidden; Removed to prevent cutting off content */
+        }
+
+        .accordion-header {
+            padding: 10px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-secondary);
+            font-size: 13px;
+            user-select: none;
+            /* border-bottom: 1px solid transparent; */
+        }
+
+        .accordion-header:hover {
+            color: var(--text-color);
+        }
+
+        .accordion-content {
+            display: none;
+            padding-top: 10px;
+            border-top: 1px solid var(--input-border);
+        }
+
+        .accordion.open .accordion-content {
+            display: block !important;
+            height: auto !important;
+            opacity: 1 !important;
+        }
+
+        .accordion.open .accordion-header {
+            color: var(--text-color);
+            margin-bottom: 1px;
+            /* tiny space */
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s;
+        }
+
+        .accordion.open .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Modal Style */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--container-bg);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            width: 80%;
+            max-width: 500px;
+            height: 70%;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.15s ease-out;
+            overflow: hidden;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--input-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .close-modal-btn {
+            color: var(--text-secondary);
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-modal-btn:hover {
+            color: var(--text-color);
+        }
+
+        .icon-grid-large {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .icon-grid-large .icon-btn {
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+        }
+
+        .icon-grid-large .icon-btn .material-icons {
+            font-size: 24px;
+        }
+
+        .icon-btn {
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid transparent;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="title-bar">
-            <div class="window-title">PachyCloud Settings</div>
+            <div class="window-title">PatchyCloud Settings</div>
             <button class="close-btn" onclick="window.close()">×</button>
         </div>
 
@@ -479,19 +642,20 @@
 
                         <!-- Windows Size -->
                         <div class="form-group">
-                            <label>窗口大小</label>
-                            <div class="help-text" style="margin-bottom: 12px;">以屏幕百分比设置窗口大小 (10-100%)</div>
-                            <div class="size-input-group">
-                                <div class="size-row">
-                                    <span class="size-row-label">宽度:</span>
-                                    <div class="input-suffix" style="flex:1;">
+                            <label>窗口大小 (屏幕百分比)</label>
+                            <div style="display: flex; gap: 15px;">
+                                <div style="flex: 1;">
+                                    <label
+                                        style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: block;">宽度</label>
+                                    <div class="input-suffix">
                                         <input type="number" id="width" name="width" min="0" max="100" placeholder="50"
                                             required>
                                     </div>
                                 </div>
-                                <div class="size-row">
-                                    <span class="size-row-label">高度:</span>
-                                    <div class="input-suffix" style="flex:1;">
+                                <div style="flex: 1;">
+                                    <label
+                                        style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: block;">高度</label>
+                                    <div class="input-suffix">
                                         <input type="number" id="height" name="height" min="0" max="100"
                                             placeholder="50" required>
                                     </div>
@@ -510,7 +674,6 @@
                         </div>
 
                         <!-- Start on Boot Checkbox -->
-                        <!-- Start on Boot Checkbox -->
                         <div class="form-group">
                             <label class="checkbox-label"
                                 style="display: flex; justify-content: flex-start; align-items: center; gap: 10px;">
@@ -519,22 +682,33 @@
                             </label>
                         </div>
 
-                        <!-- AdBlock Checkbox -->
-                        <div class="form-group">
-                            <label class="checkbox-label"
-                                style="display: flex; justify-content: flex-start; align-items: center; gap: 10px;">
-                                <span>启用网络广告拦截 (AdBlock) - 不稳定</span>
-                                <input type="checkbox" id="enableNetworkAdBlock" name="enableNetworkAdBlock"
-                                    class="custom-checkbox">
-                            </label>
+                        <!-- More Options Accordion -->
+                        <div class="accordion" id="moreOptionsAccordion"
+                            style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); padding: 0 10px;">
+                            <div class="accordion-header">
+                                <span style="font-weight: 600;">更多选项 (广告拦截等)</span>
+                                <span class="material-icons accordion-icon">expand_more</span>
+                            </div>
+                            <div class="accordion-content"
+                                style="border-top: 1px solid rgba(255,255,255,0.1); margin-top:0; padding-bottom: 10px;">
+                                <!-- AdBlock Checkbox -->
+                                <div class="form-group" style="margin-top: 10px; margin-bottom: 0;">
+                                    <label class="checkbox-label"
+                                        style="display: flex; justify-content: flex-start; align-items: center; gap: 10px;">
+                                        <span>启用网络广告拦截 (AdBlock) - 不稳定</span>
+                                        <input type="checkbox" id="enableNetworkAdBlock" name="enableNetworkAdBlock"
+                                            class="custom-checkbox">
+                                    </label>
 
-                            <!-- YouTube AdSkip -->
-                            <label class="checkbox-label"
-                                style="display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-top: 10px;">
-                                <span>YouTube 广告自动跳过 (脚本) - 推荐</span>
-                                <input type="checkbox" id="enableYouTubeAdSkip" name="enableYouTubeAdSkip"
-                                    class="custom-checkbox">
-                            </label>
+                                    <!-- YouTube AdSkip -->
+                                    <label class="checkbox-label"
+                                        style="display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-top: 10px;">
+                                        <span>YouTube 广告自动跳过 (脚本) - 推荐</span>
+                                        <input type="checkbox" id="enableYouTubeAdSkip" name="enableYouTubeAdSkip"
+                                            class="custom-checkbox">
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -551,6 +725,36 @@
                                 style="margin-top:0; flex: 1; overflow-y: auto; min-height: 0;">
                                 <!-- Removed .content class to avoid double padding -->
                                 <!-- Reusing .content style for scrollbar -->
+
+                                <!-- Page Title -->
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label>页面名称 (可选)</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" id="pageLabel" placeholder="例如: 📺 或 工作" style="flex: 1;">
+                                        <button type="button" class="btn btn-secondary" id="openIconModalBtn"
+                                            style="padding: 0 15px;" title="选择图标库">
+                                            <span class="material-icons">grid_view</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Icon Modal -->
+                                <div id="iconModal" class="modal">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h3>选择图标</h3>
+                                            <span class="close-modal-btn">&times;</span>
+                                        </div>
+                                        <div style="padding: 10px; border-bottom: 1px solid var(--input-border);">
+                                            <input type="text" id="iconSearch" placeholder="搜索图标 (例如: home, edit)..."
+                                                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color);">
+                                        </div>
+                                        <div class="icon-grid-large" id="modalIconGrid">
+                                            <!-- Icons injected here -->
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="form-group" id="urlGroup">
                                     <label>网址列表 (最多10个)</label>
                                     <div id="urlContainer"></div>
@@ -558,12 +762,24 @@
                                         style="margin-top: 10px; padding: 8px 16px; width: 100%; justify-content: center;">+
                                         添加网址</button>
                                 </div>
-                                <div class="form-group">
-                                    <label style="display: block; margin-bottom: 8px;">
-                                        自定义脚本 (类似 Tampermonkey，将在页面加载完成后执行)
-                                    </label>
-                                    <textarea id="customScript" name="customScript" rows="6"
-                                        placeholder="// 在这里输入 JavaScript 代码..."></textarea>
+
+                                <!-- Advanced Settings Accordion -->
+                                <div class="accordion"
+                                    style="margin-top: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 0 10px;">
+                                    <div class="accordion-header">
+                                        <span style="font-weight: 600;">高级选项</span>
+                                        <span class="material-icons accordion-icon">expand_more</span>
+                                    </div>
+                                    <div class="accordion-content"
+                                        style="border-top: 1px solid rgba(255,255,255,0.1); margin-top:0; padding-bottom: 10px;">
+                                        <div class="form-group">
+                                            <label style="display: block; margin-bottom: 8px; margin-top: 10px;">
+                                                自定义脚本 (页面加载后执行)
+                                            </label>
+                                            <textarea id="customScript" name="customScript" rows="6"
+                                                placeholder="// 在这里输入 JavaScript 代码..."></textarea>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -587,22 +803,23 @@
         let currentPageIndex = 0;
         let pagesData = [];
 
-        // 监听配置加载
-        window.electronAPI.onLoadConfig((event, config) => {
+        // Initialize Data Handling (Migration Logic)
+        function initPagesData(config) {
             currentConfig = config;
 
-            // Initialize pagesData
             if (config.pages && config.pages.length > 0) {
                 // Migrate old string urls to items with width
                 pagesData = config.pages.map(p => {
                     let items = [];
+                    // Preserve label
+                    const label = p.label || '';
+
                     if (p.items) {
                         items = p.items.map(item => ({ ...item }));
                     } else if (p.urls) {
                         const validUrls = p.urls.filter(u => u !== '');
                         const count = validUrls.length;
                         if (count === 0 && p.urls.length > 0) {
-                            // retain empty if it was just empty
                             items = p.urls.map(u => ({ url: u, width: 100 }));
                         } else {
                             const w = count > 0 ? Math.floor(100 / count) : 100;
@@ -613,8 +830,6 @@
                                 }
                                 return { url: u, width: width };
                             });
-
-                            // Re-calculate to be sure
                             const nonEmpties = items.filter(i => i.url !== '');
                             const c = nonEmpties.length;
                             const cw = c > 0 ? Math.floor(100 / c) : 100;
@@ -623,10 +838,9 @@
                             });
                         }
                     }
-                    return { items };
+                    return { items, label: label };
                 });
             } else if (config.urls) {
-                // Very old config migration
                 const c = config.urls.length;
                 const w = c > 0 ? Math.floor(100 / c) : 100;
                 const items = config.urls.map((u, i) => ({
@@ -642,7 +856,11 @@
             for (let i = 0; i < 10; i++) {
                 if (!pagesData[i]) pagesData[i] = { items: [] };
             }
+        }
 
+        // 监听配置加载
+        window.electronAPI.onLoadConfig((event, config) => {
+            initPagesData(config);
             loadConfigToForm(config);
             renderTabs();
             loadPageUrls(0);
@@ -655,7 +873,19 @@
             for (let i = 0; i < 10; i++) {
                 const btn = document.createElement('div');
                 btn.className = `tab-btn ${i === currentPageIndex ? 'active' : ''}`;
-                btn.textContent = `${i + 1}`;
+
+                let tabLabel = `${i + 1}`;
+                if (pagesData[i] && pagesData[i].label && typeof pagesData[i].label === 'string' && pagesData[i].label.trim()) {
+                    const originalLabel = pagesData[i].label.trim();
+                    if (originalLabel.startsWith('icon:')) {
+                        const iconName = originalLabel.substring(5);
+                        btn.innerHTML = `<span class="material-icons" style="font-size: 14px;">${iconName}</span>`;
+                        tabLabel = ''; // Skip default text content
+                    } else {
+                        tabLabel = originalLabel.substring(0, 2);
+                    }
+                }
+                if (tabLabel) btn.textContent = tabLabel;
 
                 if (pagesData[i] && pagesData[i].items && pagesData[i].items.some(u => u.url.trim() !== '')) {
                     btn.classList.add('has-content');
@@ -676,6 +906,7 @@
         function saveCurrentPageToMemory() {
             const urlInputs = document.querySelectorAll('.url-input');
             const widthInputs = document.querySelectorAll('.width-input');
+            const labelInput = document.getElementById('pageLabel');
 
             const items = [];
             urlInputs.forEach((input, index) => {
@@ -687,6 +918,7 @@
 
             if (!pagesData[currentPageIndex]) pagesData[currentPageIndex] = { items: [] };
             pagesData[currentPageIndex].items = items;
+            pagesData[currentPageIndex].label = labelInput ? labelInput.value : '';
         }
 
         function loadPageUrls(pageIndex) {
@@ -694,6 +926,9 @@
             urlContainer.innerHTML = '';
 
             const data = pagesData[pageIndex] || { items: [] };
+            const labelInput = document.getElementById('pageLabel');
+            labelInput.value = data.label || '';
+
             let items = data.items || [];
 
             items.forEach(item => {
@@ -817,7 +1052,35 @@
                 if (checkbox) checkbox.checked = true; // Default true
             }
 
+
+
+            // Global script is deprecated per page? Or still used?
+            // The user asked for "custom script" to be folded.
+            // Wait, previous implementation was: config.customScript (global).
+            // But now we are inside the page content loop.
+            // Is the user expecting page-specific script or global?
+            // "自定义脚本 (页面加载后执行)" -> implies per page?
+            // But current config.customScript is global.
+            // Let's assume the user wants access to the global script or we should move it?
+            // The UI is inside the "Page Configuration" right column.
+            // If it's global, it should be in Left Column.
+            // But it has been in Right Column (implying per page context visually, but code was global).
+            // Let's stick to GLOBAL for now as per previous code, just moved in UI.
+            // Actually, if it's in the tabbed area, it SUGGESTS per page.
+            // The previous code: `document.getElementById('customScript').value = config.customScript || '';`
+            // This sets the value ONCE when config loads. It does NOT change when tabs switch.
+            // So it IS global currently.
+            // We'll keep it as global for now but folded.
+
             document.getElementById('customScript').value = config.customScript || '';
+
+            // Initialize Icons - No longer needed here as Modal handles it on demand.
+            // But we keep this empty or remove it.
+        }
+
+        // Old array and function removed.
+        function renderIconGrid() {
+            // Legacy stub
         }
 
         document.getElementById('addUrlBtn').addEventListener('click', () => {
@@ -830,6 +1093,102 @@
                 updateUrlCount();
             }
         });
+
+        // --- Icon Modal Logic ---
+        const modal = document.getElementById('iconModal');
+        const openModalBtn = document.getElementById('openIconModalBtn');
+        const closeModalBtn = document.querySelector('.close-modal-btn');
+        const iconSearch = document.getElementById('iconSearch');
+        const modalIconGrid = document.getElementById('modalIconGrid');
+
+        // Large set of Material Icons
+        const allMaterialIcons = [
+            // Home & Action
+            'home', 'search', 'settings', 'done', 'check_circle', 'favorite', 'favorite_border', 'star', 'star_border',
+            'delete', 'edit', 'add', 'remove', 'close', 'menu', 'arrow_back', 'arrow_forward', 'refresh', 'more_vert',
+            'apps', 'cancel', 'save', 'history', 'file_download', 'file_upload', 'print', 'share', 'lock', 'lock_open',
+            'visibility', 'visibility_off', 'language', 'help', 'info', 'warning', 'error', 'account_circle', 'logout',
+            // Communication
+            'email', 'chat', 'message', 'call', 'contact_mail', 'rss_feed', 'notifications', 'notifications_active',
+            // Media
+            'play_arrow', 'pause', 'stop', 'skip_next', 'skip_previous', 'volume_up', 'volume_off', 'mic', 'mic_off',
+            'videocam', 'movie', 'music_note', 'library_music', 'playlist_play', 'headphones',
+            // Device
+            'computer', 'desktop_windows', 'laptop', 'smartphone', 'tablet', 'mouse', 'keyboard', 'memory', 'router',
+            // Hardware & Files
+            'security', 'build', 'content_copy', 'content_paste', 'folder', 'folder_open', 'cloud', 'cloud_queue',
+            'attachment', 'image', 'picture_as_pdf', 'description', 'insert_drive_file',
+            // Map & Places
+            'map', 'place', 'local_shipping', 'flight', 'directions_car', 'local_taxi', 'restaurant', 'hotel', 'store',
+            'shopping_cart', 'local_offer', 'work', 'school',
+            // Tech & Dev
+            'code', 'developer_mode', 'bug_report', 'terminal', 'extension', 'dashboard', 'view_quilt', 'web',
+            // Other
+            'schedule', 'today', 'calendar_today', 'alarm', 'watch_later', 'timer', 'paid', 'credit_card', 'account_balance',
+            'face', 'fingerprint', 'verified', 'light_mode', 'dark_mode', 'palette', 'format_paint', 'brush'
+        ];
+
+        function renderModalIcons(filter = '') {
+            modalIconGrid.innerHTML = '';
+            const filtered = allMaterialIcons.filter(icon => icon.includes(filter.toLowerCase()));
+
+            filtered.forEach(icon => {
+                const btn = document.createElement('div');
+                btn.className = 'icon-btn';
+                btn.innerHTML = `<span class="material-icons">${icon}</span>`;
+                btn.onclick = () => {
+                    const labelInput = document.getElementById('pageLabel');
+                    // Store as special formatted string
+                    if (labelInput) labelInput.value = 'icon:' + icon;
+                    closeModal();
+                };
+                modalIconGrid.appendChild(btn);
+            });
+        }
+
+        function openModal() {
+            modal.classList.add('show');
+            iconSearch.value = '';
+            iconSearch.focus();
+            renderModalIcons();
+        }
+
+        function closeModal() {
+            modal.classList.remove('show');
+        }
+
+        openModalBtn.addEventListener('click', openModal);
+        closeModalBtn.addEventListener('click', closeModal);
+
+        // Close on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target == modal) {
+                closeModal();
+            }
+        });
+
+        // Search listener
+        iconSearch.addEventListener('input', (e) => {
+            renderModalIcons(e.target.value);
+        });
+
+        // --- Accordion Logic ---
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', function () {
+                // Find parent .accordion
+                const accordion = this.closest('.accordion');
+                if (accordion) {
+                    accordion.classList.toggle('open');
+                }
+            });
+        });
+
+        // Remove the old inline renderIconGrid Logic
+        // We override or ignore the previous small list logic since we bound it to the modal now.
+        // But wait, the previous code called renderIconGrid() inside init. 
+        // We should ensure that doesn't break anything (it tries to find #iconGrid which we might have removed).
+        // If we removed #iconGrid HTML, previous JS might throw null error. 
+        // I changed the HTML to remove #iconGrid, so I must fix the JS calling it.
 
         // 表单提交处理
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -873,11 +1232,11 @@
                         }
                     }
 
-                    cleanPages.push({ items: items }); // use new 'items' field
-                    // also keep 'urls' for backward compatibility if needed? 
+                    cleanPages.push({ items: items, label: pagesData[i].label || '' }); // use new 'items' field
+                    // also keep 'urls' for backward compatibility if needed?
                     // No, we are migrating to 'items' in main.js.
-                    // But wait, if I assume main.js will switch to using 'items', 
-                    // I will change the config structure. 
+                    // But wait, if I assume main.js will switch to using 'items',
+                    // I will change the config structure.
                     // cleanPages.push({ items });
                 }
 
@@ -935,8 +1294,10 @@
 
         // 初始化时获取配置
         window.electronAPI.getConfig().then(config => {
-            currentConfig = config;
+            initPagesData(config);
             loadConfigToForm(config);
+            renderTabs();
+            loadPageUrls(0);
         });
 
         // 输入验证

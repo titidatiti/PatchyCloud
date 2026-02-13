@@ -271,21 +271,45 @@
     quitBtn.addEventListener('click', async () => { await window.electronAPI.quitApp(); });
     // Page Navigation Logic
     window.electronAPI.onUpdatePages((event, data) => {
-      const { count, active } = data;
-      renderPageButtons(count, active);
+      // Use structured pages if available, else count
+      renderPageButtons(data);
     });
 
-    function renderPageButtons(count, activeIndex) {
+    function renderPageButtons(data) {
       const container = document.getElementById('pageNav');
       container.innerHTML = ''; // Clear existing
 
-      // Safety cap or rely on config cap? Config is capped at 9.
-      // It's cleaner to show just what is needed.
+      const count = data.count || 0;
+      const activeIndex = data.active;
+      const pages = data.pages || [];
 
       for (let i = 0; i < count; i++) {
         const btn = document.createElement('div');
         btn.className = `page-btn ${i === activeIndex ? 'active' : ''}`;
-        btn.textContent = i + 1;
+
+        let label = (i + 1).toString();
+        // Use custom label if available
+        if (pages[i] && pages[i].label) {
+          label = pages[i].label;
+
+          // Check for icon prefix
+          if (label.startsWith('icon:')) {
+            const iconName = label.substring(5);
+            btn.innerHTML = `<span class="material-icons" style="font-size: 16px;">${iconName}</span>`;
+            // Use innerHTML for icon, skip textContent below
+            label = ''; // Set empty to skip textContent setting if logic below uses it
+          } else {
+            // If label is long, maybe add class to scale font?
+            if (label.length > 2) {
+              btn.style.fontSize = '10px'; // Shrink for longer text
+            }
+            btn.textContent = label;
+          }
+        } else {
+          btn.textContent = label;
+        }
+        btn.title = `Page ${i + 1}${pages[i] && pages[i].label ? ' - ' + pages[i].label : ''}`;
+
         btn.onclick = () => {
           window.electronAPI.switchPage(i);
         };
