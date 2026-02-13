@@ -341,6 +341,16 @@ function CreateView() {
         }
       });
       v.setBackgroundColor('#1a1a1a');
+
+      // Inject custom script if available
+      if (config.customScript && config.customScript.trim() !== '') {
+        const script = config.customScript;
+        v.webContents.on('did-finish-load', () => {
+          v.webContents.executeJavaScript(script).catch(err => {
+            console.error('Failed to execute custom script:', err);
+          });
+        });
+      }
       v.webContents.loadURL(url);
       newViews.push(v);
     });

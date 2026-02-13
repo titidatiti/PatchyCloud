@@ -540,6 +540,13 @@
                                         style="margin-top: 10px; padding: 8px 16px; width: 100%; justify-content: center;">+
                                         添加网址</button>
                                 </div>
+                                <div class="form-group">
+                                    <label style="display: block; margin-bottom: 8px;">
+                                        自定义脚本 (类似 Tampermonkey，将在页面加载完成后执行)
+                                    </label>
+                                    <textarea id="customScript" name="customScript" rows="6"
+                                        placeholder="// 在这里输入 JavaScript 代码..."></textarea>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -779,6 +786,7 @@
                 const checkbox = document.getElementById('openAtLogin');
                 if (checkbox) checkbox.checked = config.openAtLogin;
             }
+            document.getElementById('customScript').value = config.customScript || '';
         }
 
         document.getElementById('addUrlBtn').addEventListener('click', () => {
@@ -853,7 +861,8 @@
                     height: parseInt(formData.get('height')),
                     triggerDistance: parseInt(formData.get('triggerDistance')),
                     displayId: formData.get('displayId'),
-                    openAtLogin: document.getElementById('openAtLogin').checked
+                    openAtLogin: document.getElementById('openAtLogin').checked,
+                    customScript: document.getElementById('customScript').value
                 };
 
                 // 验证URL格式 (Only for non-empty)
