@@ -1,6 +1,10 @@
-const { app, BrowserWindow, BrowserView, Tray, Menu, screen, ipcMain, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, BrowserView, Tray, Menu, screen, ipcMain, shell, nativeImage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { ElectronBlocker } = require('@cliqz/adblocker-electron');
+const fetch = require('cross-fetch');
+
+let blocker; // Global blocker instance
 
 let mainWindow;
 let contentViews = []; // Currently displayed content views
@@ -35,7 +39,9 @@ const defaultConfig = {
   width: 50, // 百分比
   height: 50, // 百分比
   triggerDistance: 10, // 像素
-  displayId: 'primary' // 显示器ID，'primary'表示主显示器
+  displayId: 'primary', // 显示器ID，'primary'表示主显示器
+  enableNetworkAdBlock: false, // 默认关闭网络层广告拦截 (不稳定)
+  enableYouTubeAdSkip: true // 默认开启 JS 脚本跳过广告 (更稳定)
 };
 
 // 配置文件路径
@@ -342,6 +348,7 @@ function CreateView() {
       });
       v.setBackgroundColor('#1a1a1a');
 
+
       // Inject custom script if available
       if (config.customScript && config.customScript.trim() !== '') {
         const script = config.customScript;
@@ -351,6 +358,36 @@ function CreateView() {
           });
         });
       }
+
+      // Explicit YouTube AdSkip Script
+      if (config.enableYouTubeAdSkip && url.includes('youtube.com')) {
+        const adSkipScript = `
+          (() => {
+            console.log('YouTube AdSkip Active');
+            setInterval(() => {
+              // Click 'Skip Ads' button
+              const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern');
+              if (skipBtn) { skipBtn.click(); console.log('Skipped Ad'); }
+              
+              // Click Overlay Ad Close button
+              const overlayClose = document.querySelector('.ytp-ad-overlay-close-button');
+              if (overlayClose) { overlayClose.click(); console.log('Closed Overlay'); }
+              
+              // Try to speed up video if ad is playing (experimental)
+              const video = document.querySelector('video');
+              const adElement = document.querySelector('.ad-showing');
+              if (adElement && video && !isNaN(video.duration)) {
+                 // video.playbackRate = 16; 
+                 // video.muted = true;
+              }
+            }, 500);
+          })();
+        `;
+        v.webContents.on('did-finish-load', () => {
+          v.webContents.executeJavaScript(adSkipScript).catch(e => console.error('AdSkip Error', e));
+        });
+      }
+
       v.webContents.loadURL(url);
       newViews.push(v);
     });
@@ -882,6 +919,9 @@ ipcMain.handle('save-config', (event, newConfig) => {
   config = { ...config, ...configToSave };
   saveConfig();
 
+  // Re-configure AdBlocker (async but no need to wait)
+  setupAdBlocker().catch(err => console.error('Error reconfiguring adblocker:', err));
+
   // 重新加载主窗口
   if (mainWindow) {
     // 重新设置窗口大小
@@ -983,9 +1023,36 @@ ipcMain.handle('toolbar-quit', () => {
   quitApp();
 });
 
+
+
+
+async function setupAdBlocker() {
+  if (config.enableNetworkAdBlock) {
+    try {
+      blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+      blocker.enableBlockingInSession(session.defaultSession);
+      console.log('Network AdBlocker enabled!');
+    } catch (e) {
+      console.error('Failed to enable AdBlocker:', e);
+    }
+  } else {
+    // If we had a blocker, we might want to disable it, but the API 
+    // doesn't have a simple disable mechanism other than not enabling it.
+    // If toggling at runtime is needed, we need to keep track.
+    // blocker.disableBlockingInSession(session.defaultSession);
+    if (blocker) {
+      blocker.disableBlockingInSession(session.defaultSession);
+      console.log('AdBlocker disabled!');
+    }
+  }
+}
+
 // 应用事件
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   loadConfig();
+
+  // Setup AdBlocker
+  await setupAdBlocker();
 
   if (!fs.existsSync(configPath)) {
     createSettingsWindow();
