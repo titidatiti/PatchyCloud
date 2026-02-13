@@ -1,5 +1,4 @@
-# PatchyCloud - 啪唧云菜单
-![PatchyCloud - 啪唧云菜单](./assets/icon.png)
+# <img src="./assets/icon.png" width="32" style="vertical-align: middle;"> PatchyCloud - 啪唧云菜单
 
 一个基于Electron的跨平台桌面应用，非常适合垂直排布的多屏幕setup。
 提供隐藏式浮动Web浏览器功能。当鼠标移动到屏幕底部边缘时，应用会从屏幕外滑入显示指定网站内容，不使用时自动隐藏，不影响其他软件的正常使用。
