@@ -699,17 +699,11 @@
                                         <input type="checkbox" id="enableNetworkAdBlock" name="enableNetworkAdBlock"
                                             class="custom-checkbox">
                                     </label>
-
-                                    <!-- YouTube AdSkip -->
-                                    <label class="checkbox-label"
-                                        style="display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-top: 10px;">
-                                        <span>YouTube 广告自动跳过 (脚本) - 推荐</span>
-                                        <input type="checkbox" id="enableYouTubeAdSkip" name="enableYouTubeAdSkip"
-                                            class="custom-checkbox">
-                                    </label>
                                 </div>
                             </div>
                         </div>
+
+
                     </div>
 
                     <!-- RIGHT COLUMN: Pages -->
@@ -1043,14 +1037,7 @@
                 const checkbox = document.getElementById('enableNetworkAdBlock');
                 if (checkbox) checkbox.checked = config.enableNetworkAdBlock;
             }
-            if (config.enableYouTubeAdSkip !== undefined) {
-                const checkbox = document.getElementById('enableYouTubeAdSkip');
-                // Default true if undefined but usually config has it
-                if (checkbox) checkbox.checked = config.enableYouTubeAdSkip;
-            } else {
-                const checkbox = document.getElementById('enableYouTubeAdSkip');
-                if (checkbox) checkbox.checked = true; // Default true
-            }
+
 
 
 
@@ -1253,7 +1240,6 @@
                     displayId: formData.get('displayId'),
                     openAtLogin: document.getElementById('openAtLogin').checked,
                     enableNetworkAdBlock: document.getElementById('enableNetworkAdBlock').checked,
-                    enableYouTubeAdSkip: document.getElementById('enableYouTubeAdSkip').checked,
                     customScript: document.getElementById('customScript').value
                 };
 

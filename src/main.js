@@ -6,6 +6,7 @@ const fetch = require('cross-fetch');
 
 let blocker; // Global blocker instance
 
+
 let mainWindow;
 let contentViews = []; // Currently displayed content views
 let pageViewCache = new Map(); // Cache of all page views: Map<index, BrowserView[]>
@@ -924,6 +925,8 @@ ipcMain.handle('save-config', (event, newConfig) => {
   // Re-configure AdBlocker (async but no need to wait)
   setupAdBlocker().catch(err => console.error('Error reconfiguring adblocker:', err));
 
+
+
   // 重新加载主窗口
   if (mainWindow) {
     // 重新设置窗口大小
@@ -988,6 +991,7 @@ ipcMain.handle('toolbar-switch-page', (event, index) => {
     // But relying on wasVisible is safer if CreateView messes up isContentVisible.
     if (wasVisible || true) {
       const targetY = screenHeight - contentHeight - taskBarHeight;
+
       updateViewBounds(targetY);
     } else {
       // Keep hidden
@@ -1048,13 +1052,23 @@ async function setupAdBlocker() {
     }
   }
 }
+// 设置全局 user agent
+app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 // 应用事件
 app.whenReady().then(async () => {
+  // 额外修复：强制修改所有网络请求的头部信息，防止 Apple Music 等网站通过检查 Headers 检测出异常
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    // 强制使用常见的 Chrome User-Agent
+    details.requestHeaders['User-Agent'] = app.userAgentFallback;
+    callback({ cancel: false, requestHeaders: details.requestHeaders });
+  });
+
   loadConfig();
 
   // Setup AdBlocker
   await setupAdBlocker();
+
 
   if (!fs.existsSync(configPath)) {
     createSettingsWindow();
