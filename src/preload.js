@@ -15,5 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onLoadDisplays: (callback) => ipcRenderer.on('load-displays', callback),
   
   // 移除监听器
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+
+  // 打开存放插件的本地文件夹
+  openExtensionsDir: () => ipcRenderer.invoke('open-extensions-dir')
 });

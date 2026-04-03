@@ -47,6 +47,35 @@ const defaultConfig = {
 
 // 配置文件路径
 const configPath = path.join(app.getPath('userData'), 'config.json');
+const extensionsDir = path.join(app.getPath('userData'), 'extensions');
+
+// 动态加载用户放入的各种 Chrome 插件
+async function loadUserExtensions() {
+  try {
+    if (!fs.existsSync(extensionsDir)) {
+      fs.mkdirSync(extensionsDir, { recursive: true });
+      console.log('已创建插件目录:', extensionsDir);
+      return;
+    }
+    
+    // 遍历该文件夹下的所有子文件夹（每个子文件夹就是一个解压后的插件）
+    const entries = fs.readdirSync(extensionsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const extPath = path.join(extensionsDir, entry.name);
+        try {
+          // Electron 仅支持加载解包后的插件文件夹
+          await session.defaultSession.loadExtension(extPath);
+          console.log(`[Extension Loaded] ${entry.name}`);
+        } catch (e) {
+          console.error(`[Extension Error] Failed to load ${entry.name}:`, e.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('检查/创建插件目录失败:', err);
+  }
+}
 
 // 加载配置
 function loadConfig() {
@@ -902,6 +931,20 @@ ipcMain.handle('open-external', async (event, url) => {
   }
 });
 
+// 打开存放插件的本地文件夹
+ipcMain.handle('open-extensions-dir', async () => {
+  try {
+    if (!fs.existsSync(extensionsDir)) {
+      fs.mkdirSync(extensionsDir, { recursive: true });
+    }
+    await shell.openPath(extensionsDir);
+    return true;
+  } catch (err) {
+    console.error('打开插件目录失败:', err);
+    return false;
+  }
+});
+
 ipcMain.handle('save-config', (event, newConfig) => {
   // Handle start on boot
   if (typeof newConfig.openAtLogin === 'boolean') {
@@ -966,7 +1009,7 @@ ipcMain.handle('save-config', (event, newConfig) => {
       // If it was hidden, CreateView already set it to hiddenY
     }
 
-    console.log(`配置更新: 全屏窗口 ${screenWidth}x${screenHeight}, 内容区域 ${contentWidth}x${contentHeight}`);
+    console.log(`[Config Updated] UI Bounds: ${screenWidth}x${screenHeight}, Content View: ${contentWidth}x${contentHeight}`);
   }
 
   return true;
@@ -1063,6 +1106,9 @@ app.whenReady().then(async () => {
     details.requestHeaders['User-Agent'] = app.userAgentFallback;
     callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
+
+  // 加载本地用户存放的解压版 Chrome 插件
+  await loadUserExtensions();
 
   loadConfig();
 
