@@ -41,6 +41,7 @@ const defaultConfig = {
   height: 50, // 百分比
   triggerDistance: 10, // 像素
   displayId: 'primary', // 显示器ID，'primary'表示主显示器
+  displayLabel: '', // 显示器名称（用于应对重启后ID改变的情况）
   enableNetworkAdBlock: false, // 默认关闭网络层广告拦截 (不稳定)
   enableYouTubeAdSkip: true // 默认开启 JS 脚本跳过广告 (更稳定)
 };
@@ -149,7 +150,13 @@ function getTargetDisplay() {
   }
 
   // 根据显示器ID查找
-  const targetDisplay = displays.find(display => display.id.toString() === config.displayId);
+  let targetDisplay = displays.find(display => display.id.toString() === config.displayId);
+  
+  // 如果通过 ID 找不到，尝试通过名称 (label) 查找
+  if (!targetDisplay && config.displayLabel) {
+    targetDisplay = displays.find(display => display.label === config.displayLabel);
+  }
+
   return targetDisplay || screen.getPrimaryDisplay();
 }
 
