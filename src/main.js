@@ -379,7 +379,7 @@ function CreateView() {
           nodeIntegration: false,
           contextIsolation: true,
           enableRemoteModule: false,
-          webSecurity: false,
+          // webSecurity: false, // 必须注释掉或为true，否则 ChatGPT 的 Cloudflare 安全质询会直接白屏
           preload: path.join(__dirname, 'preload.js')
         }
       });
@@ -1102,15 +1102,20 @@ async function setupAdBlocker() {
     }
   }
 }
-// 设置全局 user agent
-app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-
 // 应用事件
 app.whenReady().then(async () => {
+  // 动态获取默认 UA 并剥离 Electron 标识，防止被 Cloudflare 反爬虫检测
+  const defaultUA = session.defaultSession.getUserAgent();
+  app.userAgentFallback = defaultUA.replace(/Electron\/[0-9\.]+\s/, '');
+
   // 额外修复：强制修改所有网络请求的头部信息，防止 Apple Music 等网站通过检查 Headers 检测出异常
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     // 强制使用常见的 Chrome User-Agent
     details.requestHeaders['User-Agent'] = app.userAgentFallback;
+    // 关键：删除 sec-ch-ua 相关 header，防止 ChatGPT/Cloudflare 检测出底层 Chromium 真实版本和 UA 不匹配
+    delete details.requestHeaders['sec-ch-ua'];
+    delete details.requestHeaders['sec-ch-ua-mobile'];
+    delete details.requestHeaders['sec-ch-ua-platform'];
     callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
 
