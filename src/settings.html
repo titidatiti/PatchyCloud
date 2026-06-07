@@ -938,25 +938,28 @@
         // 加载显示器到选择框
         function loadDisplaysToSelect(displays) {
             const select = document.getElementById('displayId');
-            //select.innerHTML = '<option value="primary">主显示器</option>';
+            select.innerHTML = '<option value="primary">主显示器</option>';
 
-            displays.forEach(display => {
+            displays.forEach((display, index) => {
                 const option = document.createElement('option');
                 option.value = display.id;
                 option.setAttribute('data-label', display.label || '');
-                const index = select.options.length + 1;
-                let label = `${index}. ${display.label} ` || `显示器 ${display.id} `;
+                let label = `${index + 1}. ${display.label || `显示器 ${display.id}`} `;
                 if (display.primary) {
-                    label += ' (主显示器)';
+                    label += ' (当前主显示器)';
                 }
                 label += ` - ${display.bounds.width}×${display.bounds.height} `;
 
                 option.textContent = label;
                 select.appendChild(option);
-                if (display.selected) {
-                    option.selected = true;
-                }
             });
+
+            // 根据 currentConfig.displayId 设置选中的选项
+            if (currentConfig.displayId) {
+                select.value = currentConfig.displayId;
+            } else {
+                select.value = 'primary';
+            }
         }
 
         // 创建URL输入框
@@ -1232,14 +1235,17 @@
 
                 const displaySelect = document.getElementById('displayId');
                 const selectedOption = displaySelect.options[displaySelect.selectedIndex];
+                const selectedDisplayId = formData.get('displayId');
+                const selectedDisplay = availableDisplays.find(d => d.id === selectedDisplayId);
 
                 const config = {
                     pages: cleanPages,
                     width: parseInt(formData.get('width')),
                     height: parseInt(formData.get('height')),
                     triggerDistance: parseInt(formData.get('triggerDistance')),
-                    displayId: formData.get('displayId'),
+                    displayId: selectedDisplayId,
                     displayLabel: selectedOption ? selectedOption.getAttribute('data-label') : '',
+                    displayBounds: selectedDisplay ? selectedDisplay.bounds : null,
                     openAtLogin: document.getElementById('openAtLogin').checked,
                     enableNetworkAdBlock: document.getElementById('enableNetworkAdBlock').checked,
                     customScript: document.getElementById('customScript').value

@@ -42,6 +42,7 @@ const defaultConfig = {
   triggerDistance: 10, // 像素
   displayId: 'primary', // 显示器ID，'primary'表示主显示器
   displayLabel: '', // 显示器名称（用于应对重启后ID改变的情况）
+  displayBounds: null, // 显示器坐标与大小（作为最后的兜底匹配）
   enableNetworkAdBlock: false, // 默认关闭网络层广告拦截 (不稳定)
   enableYouTubeAdSkip: true // 默认开启 JS 脚本跳过广告 (更稳定)
 };
@@ -149,15 +150,81 @@ function getTargetDisplay() {
     return screen.getPrimaryDisplay();
   }
 
-  // 根据显示器ID查找
+  // 1. 根据显示器ID查找
   let targetDisplay = displays.find(display => display.id.toString() === config.displayId);
   
-  // 如果通过 ID 找不到，尝试通过名称 (label) 查找
+  // 2. 如果通过 ID 找不到，尝试通过名称 (label) 查找
   if (!targetDisplay && config.displayLabel) {
     targetDisplay = displays.find(display => display.label === config.displayLabel);
   }
 
+  // 3. 如果还找不到，尝试通过坐标和尺寸 (bounds) 查找
+  if (!targetDisplay && config.displayBounds) {
+    targetDisplay = displays.find(display => {
+      return display.bounds.x === config.displayBounds.x &&
+             display.bounds.y === config.displayBounds.y &&
+             display.bounds.width === config.displayBounds.width &&
+             display.bounds.height === config.displayBounds.height;
+    });
+  }
+
   return targetDisplay || screen.getPrimaryDisplay();
+}
+
+// 检查目标显示器是否可用
+function isTargetDisplayAvailable() {
+  if (config.displayId === 'primary') {
+    return true;
+  }
+  const displays = screen.getAllDisplays();
+  
+  // 1. 检查 ID
+  let found = displays.some(display => display.id.toString() === config.displayId);
+  
+  // 2. 检查 label
+  if (!found && config.displayLabel) {
+    found = displays.some(display => display.label === config.displayLabel);
+  }
+  
+  // 3. 检查 bounds
+  if (!found && config.displayBounds) {
+    found = displays.some(display => {
+      return display.bounds.x === config.displayBounds.x &&
+             display.bounds.y === config.displayBounds.y &&
+             display.bounds.width === config.displayBounds.width &&
+             display.bounds.height === config.displayBounds.height;
+    });
+  }
+  
+  return found;
+}
+
+// 等待目标显示器就绪
+function waitForTargetDisplay() {
+  return new Promise((resolve) => {
+    if (isTargetDisplayAvailable()) {
+      resolve();
+      return;
+    }
+
+    console.log(`[Display Startup] 目标显示器 (ID: ${config.displayId}, Label: ${config.displayLabel}) 未就绪，等待中...`);
+    
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 500ms = 10秒超时
+    
+    const interval = setInterval(() => {
+      attempts++;
+      if (isTargetDisplayAvailable() || attempts >= maxAttempts) {
+        clearInterval(interval);
+        if (attempts >= maxAttempts) {
+          console.warn('[Display Startup] 等待目标显示器超时。将使用主显示器。');
+        } else {
+          console.log(`[Display Startup] 目标显示器在 ${attempts * 500}ms 后已就绪。`);
+        }
+        resolve();
+      }
+    }, 500);
+  });
 }
 
 let toolbarView;
@@ -1102,6 +1169,49 @@ async function setupAdBlocker() {
     }
   }
 }
+// 重新计算并更新主窗口及其视图的位置和大小
+function updateMainWindowPosition() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const targetDisplay = getTargetDisplay();
+  const { width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  const { x: screenX, y: screenY } = targetDisplay.bounds;
+
+  console.log(`[MainWindow Position] 调整主窗口位置到显示器: ${targetDisplay.label || targetDisplay.id} (${screenX}, ${screenY}, ${screenWidth}x${screenHeight})`);
+
+  // 更新主窗口边界
+  mainWindow.setBounds({
+    x: screenX,
+    y: screenY,
+    width: screenWidth,
+    height: screenHeight
+  });
+
+  // 重新计算并更新内容 BrowserViews 边界
+  const { height: contentHeight, taskBarHeight } = getWindowConfigSize();
+  if (isContentVisible()) {
+    const targetY = screenHeight - contentHeight - taskBarHeight;
+    updateViewBounds(targetY);
+  } else {
+    const hiddenY = screenHeight + hiddenOffset;
+    updateViewBounds(hiddenY);
+  }
+}
+
+// 更新设置窗口中的显示器列表
+function updateSettingsWindowDisplays() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    const displays = screen.getAllDisplays().map(display => ({
+      id: display.id.toString(),
+      label: display.label || `显示器 ${display.id}`,
+      bounds: display.bounds,
+      primary: display.id === screen.getPrimaryDisplay().id,
+      selected: display.id === getTargetDisplay().id
+    }));
+    settingsWindow.webContents.send('load-displays', displays);
+  }
+}
+
 // 应用事件
 app.whenReady().then(async () => {
   // 动态获取默认 UA 并剥离 Electron 标识，防止被 Cloudflare 反爬虫检测
@@ -1132,10 +1242,32 @@ app.whenReady().then(async () => {
     createSettingsWindow();
   }
 
+  // 确认显示器就绪
+  await waitForTargetDisplay();
+
   createMainWindow();
   createTray();
   startMouseTracking();
   forceAlwaysOnTop();
+
+  // 监听显示器变化事件
+  screen.on('display-added', (event, newDisplay) => {
+    console.log(`[Display Event] 检测到新增显示器: ${newDisplay.label || newDisplay.id}`);
+    updateMainWindowPosition();
+    updateSettingsWindowDisplays();
+  });
+
+  screen.on('display-removed', (event, oldDisplay) => {
+    console.log(`[Display Event] 检测到移除了显示器: ${oldDisplay.label || oldDisplay.id}`);
+    updateMainWindowPosition();
+    updateSettingsWindowDisplays();
+  });
+
+  screen.on('display-metrics-changed', (event, display, changedMetrics) => {
+    console.log(`[Display Event] 显示器参数更改: ${display.label || display.id}, 更改内容:`, changedMetrics);
+    updateMainWindowPosition();
+    updateSettingsWindowDisplays();
+  });
 });
 
 // 全局变量控制退出状态
